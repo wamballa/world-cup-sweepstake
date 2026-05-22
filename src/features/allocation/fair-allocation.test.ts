@@ -24,29 +24,58 @@ function fixedRandom() {
 }
 
 describe("fair allocation", () => {
-  it("allocates all 48 teams evenly when participant count divides 48", () => {
-    const people = participants(8);
+  it.each([
+    { participantCount: 1, expectedSpread: { min: 48, max: 48 } },
+    { participantCount: 2, expectedSpread: { min: 24, max: 24 } },
+    { participantCount: 24, expectedSpread: { min: 2, max: 2 } },
+    { participantCount: 48, expectedSpread: { min: 1, max: 1 } },
+  ])(
+    "allocates all 48 teams evenly for $participantCount participants",
+    ({ participantCount, expectedSpread }) => {
+      const people = participants(participantCount);
+      const allocations = createFairAllocation(people, teams, fixedRandom);
+      const spread = getAllocationSpread(
+        people.map((participant) => participant.id),
+        allocations,
+      );
+
+      expect(allocations).toHaveLength(48);
+      expect(spread).toEqual(expectedSpread);
+      expect(validateCompleteAllocation(people, teams, allocations)).toBe(true);
+    },
+  );
+
+  it.each([
+    { participantCount: 7, expectedSpread: { min: 6, max: 7 } },
+    { participantCount: 47, expectedSpread: { min: 1, max: 2 } },
+    { participantCount: 49, expectedSpread: { min: 0, max: 1 } },
+  ])(
+    "keeps uneven allocations within one team for $participantCount participants",
+    ({ participantCount, expectedSpread }) => {
+      const people = participants(participantCount);
+      const allocations = createFairAllocation(people, teams, fixedRandom);
+      const spread = getAllocationSpread(
+        people.map((participant) => participant.id),
+        allocations,
+      );
+
+      expect(allocations).toHaveLength(48);
+      expect(spread).toEqual(expectedSpread);
+      expect(spread.max - spread.min).toBeLessThanOrEqual(1);
+      expect(validateCompleteAllocation(people, teams, allocations)).toBe(true);
+    },
+  );
+
+  it("does not duplicate participants or teams when the draw is uneven", () => {
+    const people = participants(49);
     const allocations = createFairAllocation(people, teams, fixedRandom);
-    const spread = getAllocationSpread(
-      people.map((participant) => participant.id),
-      allocations,
+    const allocatedTeamIds = new Set(allocations.map((allocation) => allocation.teamId));
+    const allocatedParticipantIds = new Set(
+      allocations.map((allocation) => allocation.participantId),
     );
 
-    expect(allocations).toHaveLength(48);
-    expect(spread).toEqual({ min: 6, max: 6 });
-    expect(validateCompleteAllocation(people, teams, allocations)).toBe(true);
-  });
-
-  it("keeps uneven allocations within one team", () => {
-    const people = participants(7);
-    const allocations = createFairAllocation(people, teams, fixedRandom);
-    const spread = getAllocationSpread(
-      people.map((participant) => participant.id),
-      allocations,
-    );
-
-    expect(spread).toEqual({ min: 6, max: 7 });
-    expect(spread.max - spread.min).toBeLessThanOrEqual(1);
+    expect(allocatedTeamIds.size).toBe(48);
+    expect(allocatedParticipantIds.size).toBe(48);
     expect(validateCompleteAllocation(people, teams, allocations)).toBe(true);
   });
 
