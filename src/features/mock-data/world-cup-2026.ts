@@ -1,3 +1,11 @@
+import {
+  calculateBadgeHolders,
+  calculateParticipantScores,
+  calculateTeamScores,
+  type BadgeCategoryInput,
+  type TournamentStage,
+} from "@/features/scoring/sweepstake-scoring";
+
 export type TeamStatus =
   | "group"
   | "qualified"
@@ -19,8 +27,13 @@ export type MockTeam = {
   seed: number;
   status: TeamStatus;
   points: number;
+  groupStageWins: number;
+  groupStageDraws: number;
+  reachedStage: TournamentStage;
   goalsFor: number;
   goalsAgainst: number;
+  cards: number | null;
+  eliminatedOrder: number | null;
   allocatedTo: string;
 };
 
@@ -133,6 +146,13 @@ const statusBySeed: Record<number, TeamStatus> = {
   4: "eliminated",
 };
 
+const reachedStageBySeed: Record<number, TournamentStage> = {
+  1: "round-of-16",
+  2: "group",
+  3: "group",
+  4: "group",
+};
+
 export const mockParticipants: MockParticipant[] = participants.map(
   (name, index) => ({
     id: `participant-${index + 1}`,
@@ -142,13 +162,17 @@ export const mockParticipants: MockParticipant[] = participants.map(
   }),
 );
 
-export const mockTeams: MockTeam[] = groupLetters.flatMap((group, groupIndex) =>
+const mockTeamPerformance = groupLetters.flatMap((group, groupIndex) =>
   Array.from({ length: 4 }, (_, seedIndex) => {
     const teamIndex = groupIndex * 4 + seedIndex;
     const seed = seedIndex + 1;
     const participant = mockParticipants[teamIndex % mockParticipants.length];
-    const winBonus = seed === 1 ? 6 : seed === 2 ? 4 : seed === 3 ? 2 : 0;
-    const progressBonus = seed === 1 && groupIndex < 4 ? 5 : 0;
+    const groupStageWins = seed === 1 ? 2 : seed === 2 ? 1 : 0;
+    const groupStageDraws = seed === 1 ? groupIndex % 2 : seed === 3 ? 2 : 0;
+    const reachedStage =
+      seed === 1 && groupIndex < 2 ? "quarter-final" : reachedStageBySeed[seed];
+    const eliminatedOrder =
+      seed === 4 ? groupIndex + 1 : seed === 3 && groupIndex < 3 ? 20 + groupIndex : null;
 
     return {
       id: `team-${group.toLowerCase()}-${seed}`,
@@ -162,13 +186,38 @@ export const mockTeams: MockTeam[] = groupLetters.flatMap((group, groupIndex) =>
       group,
       seed,
       status: statusBySeed[seed],
-      points: winBonus + progressBonus,
+      groupStageWins,
+      groupStageDraws,
+      reachedStage,
       goalsFor: Math.max(0, 7 - seed + (groupIndex % 3)),
       goalsAgainst: seed + (groupIndex % 2),
+      cards: seed === 4 ? null : seed + (groupIndex % 4),
+      eliminatedOrder,
       allocatedTo: participant.id,
     };
   }),
 );
+
+const scoreByTeam = new Map(
+  calculateTeamScores(
+    mockTeamPerformance.map((team) => ({
+      teamId: team.id,
+      name: team.name,
+      groupStageWins: team.groupStageWins,
+      groupStageDraws: team.groupStageDraws,
+      reachedStage: team.reachedStage,
+      goalsFor: team.goalsFor,
+      goalsAgainst: team.goalsAgainst,
+      cards: team.cards,
+      eliminatedOrder: team.eliminatedOrder,
+    })),
+  ).map((score) => [score.teamId, score]),
+);
+
+export const mockTeams: MockTeam[] = mockTeamPerformance.map((team) => ({
+  ...team,
+  points: scoreByTeam.get(team.id)?.points ?? 0,
+}));
 
 export const mockMatches: MockMatch[] = [
   {
@@ -239,75 +288,110 @@ export const mockMatches: MockMatch[] = [
   },
 ];
 
-export const mockBadges: MockBadge[] = [
+const mockBadgeCategories = [
   {
     id: "badge-first",
+    key: "first-place",
     label: "1st Place",
     status: "active",
-    holderParticipantIds: ["participant-1"],
     supportLine: "Highest mock participant total.",
   },
   {
     id: "badge-second",
+    key: "second-place",
     label: "2nd Place",
     status: "active",
-    holderParticipantIds: ["participant-2"],
     supportLine: "Shared ranks are supported when totals match.",
   },
   {
+    id: "badge-third",
+    key: "third-place",
+    label: "3rd Place",
+    status: "active",
+    supportLine: "Calculated from deterministic shared ranks.",
+  },
+  {
+    id: "badge-fourth",
+    key: "fourth-place",
+    label: "4th Place",
+    status: "active",
+    supportLine: "Calculated from deterministic shared ranks.",
+  },
+  {
     id: "badge-wooden-spoon",
+    key: "wooden-spoon",
     label: "Wooden Spoon",
     status: "active",
-    holderParticipantIds: ["participant-4"],
     supportLine: "Lowest mock participant total.",
   },
   {
     id: "badge-first-knocked-out",
+    key: "first-knocked-out",
     label: "First Knocked Out",
-    status: "undecided",
-    holderParticipantIds: [],
-    supportLine: "Decided from cached elimination data later.",
+    status: "active",
+    supportLine: "Calculated from cached elimination order.",
+  },
+  {
+    id: "badge-most-goals-conceded",
+    key: "most-goals-conceded",
+    label: "Most Goals Conceded",
+    status: "active",
+    supportLine: "Calculated from cached goals-against totals.",
+  },
+  {
+    id: "badge-fewest-goals-scored",
+    key: "fewest-goals-scored",
+    label: "Fewest Goals Scored",
+    status: "active",
+    supportLine: "Calculated from cached goals-for totals.",
   },
   {
     id: "badge-most-cards",
+    key: "most-cards",
     label: "Most Cards",
     status: "manual-future",
-    holderParticipantIds: [],
     supportLine: "Marked manual/future for the free data tier.",
   },
-];
+] satisfies Array<
+  Omit<MockBadge, "holderParticipantIds"> & Pick<BadgeCategoryInput, "key">
+>;
+
+export const mockBadges: MockBadge[] = mockBadgeCategories.map((category) => ({
+  ...category,
+  holderParticipantIds: getBadgeParticipantHolders(category.id),
+}));
 
 export function getTeamName(teamId: string) {
   return mockTeams.find((team) => team.id === teamId)?.name ?? "Unknown team";
 }
 
 export function getParticipantStandings(): ParticipantStanding[] {
-  const totals = mockParticipants.map((participant) => {
-    const teams = mockTeams.filter((team) => team.allocatedTo === participant.id);
-    const points = teams.reduce((total, team) => total + team.points, 0);
-
-    return {
-      participantId: participant.id,
+  return calculateParticipantScores(
+    mockParticipants.map((participant) => ({
+      id: participant.id,
       name: participant.displayName,
-      points,
-      teamCount: teams.length,
-      teamNames: teams.map((team) => team.name),
-    };
-  });
-
-  const sorted = totals.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
-
-  let lastPoints: number | null = null;
-  let lastRank = 0;
-
-  return sorted.map((standing, index) => {
-    if (standing.points !== lastPoints) {
-      lastRank = index + 1;
-      lastPoints = standing.points;
-    }
-
-    return { ...standing, rank: lastRank };
-  });
+    })),
+    mockTeams.map((team) => ({
+      participantId: team.allocatedTo,
+      teamId: team.id,
+    })),
+    calculateTeamScores(
+      mockTeams.map((team) => ({
+        teamId: team.id,
+        name: team.name,
+        groupStageWins: team.groupStageWins,
+        groupStageDraws: team.groupStageDraws,
+        reachedStage: team.reachedStage,
+        goalsFor: team.goalsFor,
+        goalsAgainst: team.goalsAgainst,
+        cards: team.cards,
+        eliminatedOrder: team.eliminatedOrder,
+      })),
+    ),
+  ).map((standing) => ({
+    ...standing,
+    teamNames: standing.teamIds.map(getTeamName),
+  }));
 }
 
 export const mockDataSummary = {
@@ -330,3 +414,49 @@ export const mockDataSummary = {
     ),
   },
 } as const;
+
+function getBadgeParticipantHolders(badgeCategoryId: string) {
+  const standings = getParticipantStandings();
+  const holders = calculateBadgeHolders({
+    categories: mockBadgeCategories.map((category) => ({
+      id: category.id,
+      key: category.key,
+      label: category.label,
+      status: category.status,
+    })),
+    participantScores: standings.map((standing) => ({
+      participantId: standing.participantId,
+      name: standing.name,
+      rank: standing.rank,
+      points: standing.points,
+      teamCount: standing.teamCount,
+      teamIds: mockTeams
+        .filter((team) => team.allocatedTo === standing.participantId)
+        .map((team) => team.id),
+    })),
+    teams: mockTeams.map((team) => ({
+      teamId: team.id,
+      name: team.name,
+      groupStageWins: team.groupStageWins,
+      groupStageDraws: team.groupStageDraws,
+      reachedStage: team.reachedStage,
+      goalsFor: team.goalsFor,
+      goalsAgainst: team.goalsAgainst,
+      cards: team.cards,
+      eliminatedOrder: team.eliminatedOrder,
+    })),
+    allocations: mockTeams.map((team) => ({
+      participantId: team.allocatedTo,
+      teamId: team.id,
+    })),
+  });
+
+  return [
+    ...new Set(
+      holders
+        .filter((holder) => holder.badgeCategoryId === badgeCategoryId)
+        .map((holder) => holder.participantId)
+        .filter((participantId): participantId is string => Boolean(participantId)),
+    ),
+  ];
+}
