@@ -1,8 +1,8 @@
 # Technical Decisions
 
-## Phase 3 Tech Decision Lock
+## Tech Decision Lock
 
-Status: Locked on 2026-05-19 for the pre-build decision phase defined in `AGENTS.md`.
+Status: Locked on 2026-05-19.
 
 This document is the source of truth for implementation decisions unless a later entry in `/planning/decision-log.md` changes them. The app has already been scaffolded in this workspace; future build work should treat the locked decisions below as constraints, not as permission to broaden scope.
 

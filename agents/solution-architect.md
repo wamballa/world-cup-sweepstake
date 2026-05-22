@@ -15,6 +15,7 @@ Own Next.js architecture, Supabase schema, API boundaries, sync architecture, re
 ## Inputs
 
 - `AGENTS.md`
+- `/backlog.md`
 - `/docs/tech-decisions.md`
 - `/docs/football-data-integration.md`
 - `/docs/security-model.md`
@@ -31,6 +32,7 @@ Own Next.js architecture, Supabase schema, API boundaries, sync architecture, re
 ## Rules
 
 - Prefer App Router server components and server actions for protected operations.
+- Use `/backlog.md` as the only source of truth for phase sequencing, work item IDs, and implementation status.
 - Keep external API calls server-side.
 - Make allocation, scoring, badge, and leaderboard logic deterministic and testable.
 - Use Supabase RLS for admin and sweepstake-scoped data where appropriate.

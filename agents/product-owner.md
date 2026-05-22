@@ -15,6 +15,7 @@ Own MVP scope, admin and participant journeys, sweepstake rules, badge model, fa
 ## Inputs
 
 - `AGENTS.md`
+- `/backlog.md`
 - `/docs/product-vision.md`
 - `/docs/app-rules.md`
 - `/docs/customer-journey.md`
@@ -32,6 +33,7 @@ Own MVP scope, admin and participant journeys, sweepstake rules, badge model, fa
 ## Rules
 
 - Do not invent requirements without recording them as decisions.
+- Use `/backlog.md` as the only source of truth for phase sequencing, work item IDs, and implementation status.
 - Prefer simple rules users can understand immediately.
 - Participants do not submit match-score guesses.
 - Allocation must feel fair and be explainable.

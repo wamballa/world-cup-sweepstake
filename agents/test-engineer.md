@@ -15,6 +15,7 @@ Own unit test strategy, integration test strategy, Playwright journeys, allocati
 ## Inputs
 
 - `AGENTS.md`
+- `/backlog.md`
 - `/docs/test-strategy.md`
 - `/docs/app-rules.md`
 - `/planning/mvp-scope.md`
@@ -30,6 +31,7 @@ Own unit test strategy, integration test strategy, Playwright journeys, allocati
 ## Rules
 
 - Fair allocation logic must have unit tests.
+- Use `/backlog.md` as the only source of truth for phase sequencing, work item IDs, and implementation status.
 - Team scoring must have unit tests.
 - Prize category calculations must have unit tests.
 - Leaderboard calculation must have unit tests.

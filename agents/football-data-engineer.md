@@ -15,6 +15,7 @@ Own football-data.org integration, API rate limits, central polling strategy, fi
 ## Inputs
 
 - `AGENTS.md`
+- `/backlog.md`
 - `/docs/football-data-integration.md`
 - `/docs/tech-decisions.md`
 - football-data.org plan limits and endpoint documentation
@@ -30,6 +31,7 @@ Own football-data.org integration, API rate limits, central polling strategy, fi
 ## Rules
 
 - The frontend must never call football-data.org directly.
+- Use `/backlog.md` as the only source of truth for phase sequencing, work item IDs, and implementation status.
 - All API calls happen server-side from central jobs.
 - Cache data in Supabase before the app reads it.
 - Respect rate limits and avoid duplicate calls.

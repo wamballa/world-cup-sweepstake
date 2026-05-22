@@ -37,6 +37,7 @@ The product may take broad inspiration from Playdrawr-style sweepstake setup sim
 - Keep the experience low friction for admins and participants.
 - Record important decisions in `/planning/decision-log.md`.
 - Track unresolved questions in `/planning/open-questions.md`.
+- Track work items and phase sequencing only in `/backlog.md`.
 - Read relevant files in `/docs`, `/planning`, and `/agents` before making decisions.
 
 ## Product Rules
@@ -102,21 +103,8 @@ Consult the project agents when their area is involved:
 
 Role-specific guidance lives in `/agents`.
 
-## Delivery Phases
+## Backlog Authority
 
-Proceed in this order:
+`/backlog.md` is the single source of truth for phase sequencing, work item IDs, and implementation status. Do not maintain a second phase list in this file.
 
-1. Workspace setup
-2. Agent planning
-3. Tech decision lock
-4. App scaffold
-5. Mock-data UI
-6. Supabase schema and auth
-7. Sweepstake creation and fair team allocation
-8. Participant leaderboard and badge tracking
-9. football-data.org sync
-10. AI features
-11. Visual polish
-12. Testing and hardening
-
-Do not skip phases without recording the reason in `/planning/decision-log.md`.
+Do not skip backlog phases or move work between phases without recording the reason in `/planning/decision-log.md`.

@@ -1,5 +1,83 @@
 # Decision Log
 
+## 2026-05-21: Preserve Draws For Late Participants
+
+Decision: Adding or editing participants after a draw must not automatically rerun, clear, or replace existing team allocations. Late entrants can be added without changing the shared board; they receive no teams until an admin explicitly uses manual team moves or reruns the draw. Deleting a participant can remove only that participant's allocations through the participant relationship, while all other allocations remain intact.
+
+Reason: A late entry should not force a confusing new draw for participants who have already seen their teams. Allocation changes must remain deliberate admin actions.
+
+## 2026-05-21: BL-076 Vercel Cron Schedule
+
+Decision: Configure Vercel Cron in `/vercel.json` to call `/api/cron/football-data-sync` daily at 06:00 UTC. Protect the route with Vercel's `CRON_SECRET` authorization convention, keep `FOOTBALL_DATA_SYNC_SECRET` as a local/manual fallback, and document the required production environment variables in `README.md`.
+
+Reason: The MVP is designed around delayed free-tier football-data.org scores, Vercel Hobby cron allows daily jobs, and a daily scheduled sync gives production a safe baseline without exceeding the free-tier 10 calls/minute football-data.org limit.
+
+Update: Deployed production to `https://world-cup-sweepstake-rouge.vercel.app`, configured the required production Supabase and football-data sync environment variables, and verified `/api/cron/football-data-sync` with a bearer-authenticated `GET`. The verification returned `200` with 48 teams, 104 matches, 153 records changed, and 1 sweepstake recalculated; Vercel logs showed the route invocation as `200`.
+
+## 2026-05-20: BL-077 Admin Login And Logout
+
+Decision: Add email/password Supabase Auth for admins using cookie-based SSR helpers, protect `/admin`, redirect signed-out admins to `/login?next=/admin`, show signed-in admin identity in the admin shell, and provide a server-side logout route. Playwright auth coverage uses hosted Supabase credentials from `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD`, skipping only that auth journey when credentials are not configured.
+
+Reason: Admin mutations and setup controls need a real authenticated surface before further production hardening, while hosted credential configuration keeps the app aligned with the intended Supabase deployment target without requiring public signup in the MVP.
+
+Update: Add a public `/signup` page for creating Supabase admin accounts and an `/auth/callback` route so email-confirmation links can establish the browser session before redirecting to `/admin`.
+
+Update: Wire the admin dashboard to account-scoped Supabase data. `/admin` now lists only sweepstakes visible through the signed-in user's `sweepstake_admins` membership, new sweepstakes create an owner row for the current user, and participant/settings saves write rows under that sweepstake id so admin data cannot cross accounts.
+
+## 2026-05-20: BL-078 Account-Scoped Allocation Persistence
+
+Decision: Replace admin allocation preview team ids with cached Supabase `teams.id` values for `WC_2026`. Admin draw, rerun, and manual move actions now save `team_allocations` rows and `allocation_audit_events` using the signed-in admin id, and `/admin` reloads saved allocations and audit history only through the current user's RLS-authorized sweepstakes.
+
+Reason: Allocation data must use real database foreign keys and account-scoped authorization so participant/team assignments persist after reload and cannot cross between admin accounts.
+
+## 2026-05-20: BL-079 Supabase Participant Management
+
+Decision: Replace admin participant mock/default state with account-scoped Supabase participant management. The admin Participants tab now starts empty for new sweepstakes, supports add, bulk import, inline edit, delete, duplicate-name checks, participant email editing, and save-to-Supabase behavior that returns real participant UUIDs before allocation can run.
+
+Reason: Participant data must belong to the signed-in admin's sweepstake and persist through reloads. Requiring saved participants before allocation prevents `team_allocations` from referencing client-only draft ids.
+
+## 2026-05-20: BL-080 Owner Archive Flow
+
+Decision: Implement sweepstake removal as owner-only soft archive by setting `sweepstakes.status` to `archived`. Archived sweepstakes are hidden from `/admin`, real shared links are served only when `get_sweepstake_by_share_token` returns a `shared` sweepstake, and saved allocations promote a sweepstake to `shared` so archive deactivates an actually usable participant link.
+
+Reason: Soft archive preserves participants, emails, allocations, badges, audit data, and future logs while giving admins a reversible data-retention path and immediately removing access from the owner dashboard and public shared route.
+
+## 2026-05-20: BL-081 Participant Entry Simplification
+
+Decision: Remove bulk participant import and the manual participant save button from the admin Participants tab. Admins now add one participant at a time, delete directly, and save inline name/email edits on blur, with each change writing through the Supabase participant save action.
+
+Reason: Once participant add/delete/edit became account-backed and immediate, the bulk/manual save path created confusing duplicate states. A single immediate CRUD model is easier to understand and keeps allocation working only from persisted participant UUIDs.
+
+## 2026-05-20: BL-082 Dynamic Football Team Count
+
+Decision: Keep football-data.org usage inside the central server sync. The sync fetches real `WC_2026` teams and matches server-side, upserts teams into Supabase, and `/admin` derives team count, participant capacity labels, fair split, and allocation notes from cached `teams` rows. Add a one-minute sync cooldown before creating the football-data.org client so repeated cron/manual calls do not burn through the free-plan 10 requests/minute limit.
+
+Reason: Admin pages must never call football-data.org per user view. Cache-first team counts let the app adapt if the synced team list changes while keeping rate-limit protection, tests, and allocation logic deterministic.
+
+## 2026-05-20: Backlog Phase 6 Testing And Hardening
+
+Decision: Complete backlog Phase 6 by expanding fair-allocation unit coverage across even, uneven, and over-subscribed participant counts; adding Playwright journeys for admin setup, allocation, shared-link preview, scoreboard tabs, leaderboard, and stale data states on mobile and desktop; and tightening shared-link/security contracts.
+
+Reason: Allocation fairness, read-only participant access, protected server operations, and mobile tab accessibility are release-critical trust surfaces for the sweepstake MVP.
+
+## 2026-05-20: BL-074 Mock Page Structure Split
+
+Decision: Split the long mock app shell into a thin coordinator plus feature-level components for admin setup, allocation/share review, shared scoreboard tabs, demo helpers, and shared UI primitives.
+
+Reason: The mock experience had grown large enough that future feature work would be harder to review safely. Separating page state from section rendering keeps the admin and participant surfaces easier to maintain without changing behavior.
+
+## 2026-05-20: BL-075 Participant-Facing Sweepstake View
+
+Decision: Add a participant-focused card to the shared scoreboard Participants tab using grounded mock data for the member's allocated teams, rank, total points, current badge status, recent/upcoming matches, and email update state.
+
+Reason: Participants need an immediate personal answer after opening the shared board: which teams they have, how they are doing, what badges matter, which matches affect them, and whether email updates are enabled.
+
+## 2026-05-20: Separate Admin And Participant Routes
+
+Decision: Keep the admin setup/allocation demo on `/` and move the participant-only shared board to `/s/[shareToken]`. Use a participant name picker saved in `localStorage` per share token for lightweight "Your sweepstake" personalization.
+
+Reason: Shared participant links must not expose admin controls, and MVP participant identity should stay low-friction without adding login, email verification, or per-participant link management.
+
 ## 2026-05-19: GitHub Version Control
 
 Decision: Use Git and GitHub as the source-control workflow for the project, with local checkpoint commits before or after meaningful update batches.
@@ -126,20 +204,64 @@ Decision: Add typed mock data under `src/features/mock-data` with 48 fictional t
 
 Reason: The app needs realistic data shapes for UI and test work before Supabase and football-data.org sync are implemented, while avoiding any claim that mock teams, scores, or fixtures are official World Cup facts.
 
-## 2026-05-19: Phase 3 Tech Decision Lock
+## 2026-05-19: Legacy Tech Decision Lock
 
 Decision: Lock the technical direction in `/docs/tech-decisions.md`: Next.js App Router with TypeScript, Tailwind CSS v4, shadcn/ui, Motion, Supabase Postgres/Auth/Realtime/RLS, server-only football-data.org sync, server-only OpenAI generation, Vitest, Playwright, Vercel hosting, and Vercel Cron. Also lock the main runtime boundaries, route boundaries, module structure, database table plan, server-only secrets rule, and test expectations.
 
-Reason: The root `AGENTS.md` delivery phase 3 requires tech decisions to be settled before further build phases. Locking these decisions reduces drift, keeps future implementation small and reviewable, and preserves the product rules around server-side data access, recalculable scoring, and protected admin operations.
+Reason: Locking these decisions reduces drift, keeps future implementation small and reviewable, and preserves the product rules around server-side data access, recalculable scoring, and protected admin operations.
 
-## 2026-05-19: Phase Numbering Clarification
+Superseded by: `2026-05-19: Backlog Is The Single Phase Source`. This decision remains valid as a technical lock, but it is no longer a phase-status source.
 
-Decision: Treat the delivery phases in `AGENTS.md` as canonical and clarify `/docs/build-phases.md` so phase 3 means Tech decision lock for current agent work. Keep the older implementation phase detail as a lower-level build sequence for later phases.
+## 2026-05-19: Legacy Phase Numbering Clarification
+
+Decision: Clarify that older phase numbering was superseded once `/backlog.md` became the only phase and status source.
 
 Reason: The workspace had two phase maps with different numbering, which could cause the project to jump into feature implementation too early.
 
-## 2026-05-19: Phase 4 App Scaffold Started
+Superseded by: `2026-05-19: Backlog Is The Single Phase Source`.
 
-Decision: Start canonical root phase 4 and treat the existing Next.js App Router scaffold as the baseline app scaffold. Confirm TypeScript, Tailwind CSS v4, shadcn/ui primitives, Motion, Vitest, Playwright, `src/` layout, `@/*` import alias, README status, and `.env.example` as the scaffold completion surface.
+## 2026-05-19: Phase 4 App Scaffold Complete
 
-Reason: Phase 3 tech decisions are locked, and phase 4 should formalize the application shell and tooling before further feature build work continues.
+Decision: Complete canonical root phase 4 and treat the existing Next.js App Router scaffold as the baseline app scaffold. Confirm TypeScript, Tailwind CSS v4, shadcn/ui primitives, Motion, Vitest, Playwright, `src/` layout, `@/*` import alias, README status, and `.env.example` as the scaffold completion surface.
+
+Reason: The tech decisions were locked, and scaffold work needed to formalize the application shell and tooling before further feature build work continued.
+
+Superseded by: `2026-05-19: Backlog Is The Single Phase Source`. This work maps to backlog Phase 1.
+
+## 2026-05-19: Phase 5 Mock-Data UI
+
+Decision: Implement the canonical phase 5 mock-data UI as a local-state admin setup, fair allocation review, share-link preview, and read-only participant scoreboard with Participants, Teams, Badges, Matches, and Stats tabs. Keep all football teams, scores, badges, matches, and standings powered by typed fictional mock data only.
+
+Reason: Phase 5 should validate the product experience before Supabase, Auth, football-data.org sync, email delivery, and AI features are wired in. Fictional mock data prevents the UI from implying unofficial World Cup facts are real.
+
+Superseded by: `2026-05-19: Backlog Is The Single Phase Source`. This work maps to backlog Phase 2 mock-complete setup and backlog Phase 3 mock-complete scoreboard tabs.
+
+## 2026-05-19: Backlog Phase 5 Football Data Sync
+
+Decision: Implement backlog Phase 5 as a server-only football-data.org integration. Add a server-side client for the World Cup 2026 teams and matches endpoints, normalize API statuses into app cache states, cache teams, matches, and team match stats in Supabase, write sync run/state records, recalculate sweepstake scores and badge holders after successful syncs, and expose a protected `/api/cron/football-data-sync` route for Vercel Cron.
+
+Reason: `/backlog.md` is now the single source of truth for phase sequencing, and its Phase 5 is Football Data Integration. The frontend must never call football-data.org, sync attempts must be observable, and API sync logic must be testable without real credentials or network calls.
+
+## 2026-05-19: Backlog Is The Single Phase Source
+
+Decision: Make `/backlog.md` the only source of truth for phase sequencing, work item IDs, and implementation status. Remove the duplicate delivery phase list from `AGENTS.md`, update `AGENTS.md` to operating rules only, and update phase references in `/docs/build-phases.md` and `README.md`.
+
+Reason: Maintaining phase lists in both `AGENTS.md` and `/backlog.md` caused conflicting phase numbers and unclear status. A single backlog prevents drift.
+
+## 2026-05-19: Agents Use Backlog For Work Status
+
+Decision: Add `/backlog.md` to every role-specific agent input list and rule set as the only source of truth for phase sequencing, work item IDs, and implementation status.
+
+Reason: All agents need the same work-status source so phase checks use the backlog and do not revive older phase numbering from planning documents.
+
+## 2026-05-19: Backlog Phase 4 Supabase Persistence
+
+Decision: Add the Phase 4 Supabase persistence foundation: SQL migration for core tables, Auth profile trigger, admin RLS policies, shared-link lookup function, protected participant email storage, allocation audit events, lazy server-side Supabase clients, admin authorization helper, and server persistence helpers for setup, allocations, team scores, participant scores, and badge holders.
+
+Reason: The app needs a durable and testable persistence contract before football-data.org sync and real scoring can be wired in. Keeping participant emails in a separate table and all privileged clients under `src/server` preserves the security rules around shared links and server-only secrets.
+
+## 2026-05-19: Backlog Phase 3 Complete
+
+Decision: Complete backlog Phase 3 by adding deterministic scoring and badge logic under `src/features/scoring`, wiring mock standings and badges to those calculations, and marking `BL-025` through `BL-033` as done. `Most Cards` remains marked manual/future in the UI on the free football-data.org tier, but the calculation supports it when reliable card data is present.
+
+Reason: Leaderboards, participant totals, team scores, and badge holders must be recalculable from cached app data and testable without AI or external API calls.

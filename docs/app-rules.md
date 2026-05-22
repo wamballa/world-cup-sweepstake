@@ -14,6 +14,8 @@
 
 - All 48 World Cup teams must be allocated.
 - Allocation is triggered by an admin action.
+- Adding or editing a participant after allocation must not automatically rerun or clear the draw.
+- Late entrants start with no allocated teams until an admin explicitly reruns the draw or manually moves teams to them.
 - Teams must be distributed as fairly as possible across participants.
 - If participant count divides evenly into 48, every participant gets the same number of teams.
 - If not, the difference between the most and fewest teams allocated must not exceed one.

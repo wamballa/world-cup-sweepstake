@@ -15,6 +15,7 @@ Own premium visual direction, mobile-first experience, sweepstake setup, partici
 ## Inputs
 
 - `AGENTS.md`
+- `/backlog.md`
 - `/docs/product-vision.md`
 - `/docs/customer-journey.md`
 - `/docs/ux-design-direction.md`
@@ -31,6 +32,7 @@ Own premium visual direction, mobile-first experience, sweepstake setup, partici
 ## Rules
 
 - Original branding, original UI, original product design.
+- Use `/backlog.md` as the only source of truth for phase sequencing, work item IDs, and implementation status.
 - Mobile-first is mandatory.
 - Do not copy Playdrawr branding, layout, text, proprietary mechanics, or visual identity.
 - Prioritize clarity for allocations, teams, points, badges, and rankings.

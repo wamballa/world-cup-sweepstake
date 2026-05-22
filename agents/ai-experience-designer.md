@@ -15,6 +15,7 @@ Own AI match summaries, leaderboard banter, sweepstake updates, daily briefing, 
 ## Inputs
 
 - `AGENTS.md`
+- `/backlog.md`
 - `/docs/ai-experience.md`
 - `/docs/football-data-integration.md`
 - `/planning/mvp-scope.md`
@@ -30,6 +31,7 @@ Own AI match summaries, leaderboard banter, sweepstake updates, daily briefing, 
 ## Rules
 
 - AI must not invent football facts, scores, lineups, injuries, form, statistics, or badge outcomes.
+- Use `/backlog.md` as the only source of truth for phase sequencing, work item IDs, and implementation status.
 - AI output must be grounded only in cached app data unless a future approved data source is added.
 - AI must not provide gambling-style advice or claim certainty.
 - AI must never alter team points, allocations, badge holders, or leaderboard totals.

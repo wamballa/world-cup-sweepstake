@@ -15,6 +15,7 @@ Own Supabase RLS model, auth rules, shared sweepstake access, admin permissions,
 ## Inputs
 
 - `AGENTS.md`
+- `/backlog.md`
 - `/docs/security-model.md`
 - `/docs/tech-decisions.md`
 - `/planning/mvp-scope.md`
@@ -30,6 +31,7 @@ Own Supabase RLS model, auth rules, shared sweepstake access, admin permissions,
 ## Rules
 
 - API keys must never be exposed to the browser.
+- Use `/backlog.md` as the only source of truth for phase sequencing, work item IDs, and implementation status.
 - Supabase service role key must only be used server-side.
 - Admin-only mutations require admin authorization.
 - Participant emails need stronger protection than display names.
@@ -51,4 +53,3 @@ Own Supabase RLS model, auth rules, shared sweepstake access, admin permissions,
 - What data is public, shared-link-only, admin-only, or service-only?
 - What rate limits are needed for AI, email, and link access?
 - What user data should be minimized or avoided?
-
