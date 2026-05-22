@@ -39,12 +39,15 @@ The product may take broad inspiration from Playdrawr-style sweepstake setup sim
 - Track unresolved questions in `/planning/open-questions.md`.
 - Track work items and phase sequencing only in `/backlog.md`.
 - Read relevant files in `/docs`, `/planning`, and `/agents` before making decisions.
+- For visual design work, read `/docs/bl-091-visual-direction.md` and preserve its approved high-energy direction unless a later decision supersedes it.
 
 ## Product Rules
 
 - The app must feel premium, polished, slick, and mobile-first.
+- The approved visual direction is documented in `/docs/bl-091-visual-direction.md`: bold, high-energy, tournament-social, mobile-first, and original.
 - Playdrawr may be used only as broad category inspiration.
 - Do not copy Playdrawr branding, layout, text, proprietary mechanics, or visual identity.
+- Do not copy Currys branding, logo, copy, proprietary layout, or direct visual identity. Any retail-promo influence is limited to broad energy, colour confidence, and campaign-like hierarchy.
 - Participants do not submit match-score guesses.
 - There are no match-score entry flows, entry cutoffs, or entry lock rules.
 - The app is based on admin-controlled random team allocation and automatic team performance scoring.

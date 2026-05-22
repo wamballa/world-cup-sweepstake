@@ -1,5 +1,31 @@
 # Decision Log
 
+## 2026-05-22: BL-096 Campaign Logo Asset
+
+Decision: Copy the provided 64x64 logo asset into `public/brand/logo1-web.png` and use it through `CampaignLogoMark` on the production participant shared board and BL-091 prototype instead of the temporary `WC` initials.
+
+Reason: The approved visual direction already established `CampaignLogoMark` as the reusable replacement point for the future logo. Serving the image from `public/brand` keeps the asset stable for Next.js static delivery and avoids one-off logo styling on individual pages.
+
+## 2026-05-22: BL-093 Participant Shared Board Visual Rollout
+
+Decision: Apply the approved BL-091 campaign visual direction to the real participant shared-board route by wrapping `/s/[shareToken]` in the reusable campaign shell, header, logo slot, panels, metrics, pills, and high-energy colour tokens from BL-092. Keep the existing server-loaded shared-board DTO, participant identity picker, Radix tabs, shared-link access, freshness labels, email-update status wording, badge awaiting-results behavior, and no-email-leak data contract unchanged.
+
+Reason: The production participant board should now match the approved high-energy direction while avoiding new unsupported behavior. Prototype affordances are mapped to real surfaces as participant/team counts, freshness/update status, leaderboard, teams, badges, matches, and stats; search/filter remains deferred to BL-094.
+
+## 2026-05-22: BL-091 Shared Board Visual Direction Spike
+
+Decision: Add a review-only shared-board design prototype for `BL-091` that uses existing preview data and explores a high-energy visual direction with bold purple/magenta accents, rounded promo-style panels, playful tournament campaign blocks, dense mobile-first content, and punchy hierarchy.
+
+Reason: The product needs a concrete visual artifact for review and iteration while preserving the live shared-link experience. The direction may borrow broad energy from the supplied retail reference but must remain original, with no Currys logo, copy, proprietary layout, or direct brand reference.
+
+Update: The BL-091 prototype direction is approved as the visual direction to carry into production pages. Capture the direction in `/docs/bl-091-visual-direction.md`, make root and UX agent guidance point to it, mark `BL-091` done, and sequence rollout through reusable styling foundations, real shared-board application, optional search/filter functionality, and admin experience refresh tickets.
+
+## 2026-05-22: BL-092 Campaign Styling Foundations
+
+Decision: Convert the approved BL-091 visual language into reusable campaign tokens and primitives before applying it to production pages. Add campaign palette tokens in `src/app/globals.css`, shared campaign layout/header/logo/panel/row/metric primitives in `src/components/campaign.tsx`, refactor the BL-091 prototype to consume those primitives, and add Playwright coverage for mobile-safe horizontal overflow.
+
+Reason: The approved look and feel should be reusable and testable rather than copied through hard-coded colours and one-off markup. The foundation keeps the future logo slot, shape language, palette, dense mobile rows, and overflow checks available for BL-093 and BL-095.
+
 ## 2026-05-21: Preserve Draws For Late Participants
 
 Decision: Adding or editing participants after a draw must not automatically rerun, clear, or replace existing team allocations. Late entrants can be added without changing the shared board; they receive no teams until an admin explicitly uses manual team moves or reruns the draw. Deleting a participant can remove only that participant's allocations through the participant relationship, while all other allocations remain intact.

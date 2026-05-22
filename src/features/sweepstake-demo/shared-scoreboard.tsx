@@ -10,9 +10,10 @@ import {
   UsersRound,
 } from "lucide-react";
 import { motion } from "motion/react";
+import type { ReactNode } from "react";
 
+import { CampaignMetric, CampaignPanel } from "@/components/campaign";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -21,12 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   type SharedBoardBadge,
   type SharedBoardData,
@@ -34,12 +30,10 @@ import {
   type SharedBoardStanding,
 } from "@/features/shared-board/shared-board-data";
 
-import {
-  formatStatus,
-  InfoTile,
-  Metric,
-  StatusBadge,
-} from "./demo-primitives";
+import { formatStatus, StatusBadge } from "./demo-primitives";
+
+const sharedBoardTabTriggerClassName =
+  "h-8 rounded-xl px-1 py-0 font-black leading-none !text-campaign-purple/65 hover:!text-campaign-purple data-active:!bg-transparent data-active:!text-campaign-purple-strong data-active:!shadow-none data-[state=active]:!bg-transparent data-[state=active]:!text-campaign-purple-strong data-[state=active]:!shadow-none [&_span]:text-inherit [&_span]:leading-none [&_svg]:text-current";
 
 export function SharedScoreboard({
   selectedParticipantId,
@@ -53,90 +47,122 @@ export function SharedScoreboard({
   const standings = boardData.standings;
 
   return (
-    <section aria-labelledby="scoreboard-heading" className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <Badge variant="outline" className="border-primary/30 text-primary">
-            Shared scoreboard
-          </Badge>
-          <h2 id="scoreboard-heading" className="mt-3 text-2xl font-semibold">
-            {boardData.sweepstakeName || "Untitled sweepstake"}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Cached tournament data. {boardData.syncState.freshnessLabel}.
-          </p>
+    <section
+      aria-label={boardData.sweepstakeName || "Untitled sweepstake"}
+      className="space-y-3"
+    >
+      <CampaignPanel
+        className="relative overflow-hidden p-5 sm:p-6"
+        tone="magenta"
+      >
+        <div className="absolute -right-12 -top-14 size-36 rounded-full bg-campaign-yellow" />
+        <div className="absolute -bottom-14 left-16 size-32 rounded-full bg-campaign-cyan/80" />
+        <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-end">
+          <div className="min-w-0">
+            <Badge className="bg-white text-campaign-purple hover:bg-white">
+              Shared scoreboard
+            </Badge>
+            <h2 className="mt-3 text-4xl font-black leading-none text-white sm:text-5xl">
+              Leaderboard, teams, badges, and match updates
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm font-semibold text-white/90 sm:text-base">
+              Cached tournament data. {boardData.syncState.freshnessLabel}.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <CampaignMetric
+              label="Leader"
+              value={
+                leadingParticipant?.name ?? boardData.summary.leaderName ?? "-"
+              }
+            />
+            <CampaignMetric
+              label="Finals"
+              value={`${boardData.summary.finalMatchCount}`}
+            />
+            <CampaignMetric
+              label="Delayed"
+              value={`${boardData.summary.delayedMatchCount}`}
+            />
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:w-[24rem]">
-          <Metric
-            label="Leader"
-            value={leadingParticipant?.name ?? boardData.summary.leaderName ?? "-"}
-          />
-          <Metric label="Finals" value={`${boardData.summary.finalMatchCount}`} />
-          <Metric label="Delayed" value={`${boardData.summary.delayedMatchCount}`} />
-        </div>
-      </div>
+      </CampaignPanel>
 
-      <Card className="bg-card">
-        <CardContent className="p-3 sm:p-4">
-          <Tabs defaultValue="participants" className="gap-4">
-            <TabsList className="grid h-auto w-full grid-cols-5">
-              <TabsTrigger
-                value="participants"
-                className="h-9 px-1"
-                aria-label="Participants"
-              >
-                <UsersRound className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Participants</span>
-              </TabsTrigger>
-              <TabsTrigger value="teams" className="h-9 px-1" aria-label="Teams">
-                <ShieldCheck className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Teams</span>
-              </TabsTrigger>
-              <TabsTrigger value="badges" className="h-9 px-1" aria-label="Badges">
-                <Medal className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Badges</span>
-              </TabsTrigger>
-              <TabsTrigger value="matches" className="h-9 px-1" aria-label="Matches">
-                <CalendarDays className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Matches</span>
-              </TabsTrigger>
-              <TabsTrigger value="stats" className="h-9 px-1" aria-label="Stats">
-                <Gauge className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Stats</span>
-              </TabsTrigger>
-            </TabsList>
+      <CampaignPanel className="p-3 sm:p-4">
+        <Tabs defaultValue="participants" className="gap-4">
+          <TabsList className="grid h-auto w-full grid-cols-5 rounded-2xl bg-campaign-lavender/40 p-1">
+            <TabsTrigger
+              value="participants"
+              className={sharedBoardTabTriggerClassName}
+              aria-label="Participants"
+            >
+              <UsersRound className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Participants</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="teams"
+              className={sharedBoardTabTriggerClassName}
+              aria-label="Teams"
+            >
+              <ShieldCheck className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Teams</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="badges"
+              className={sharedBoardTabTriggerClassName}
+              aria-label="Badges"
+            >
+              <Medal className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Badges</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="matches"
+              className={sharedBoardTabTriggerClassName}
+              aria-label="Matches"
+            >
+              <CalendarDays className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Matches</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="stats"
+              className={sharedBoardTabTriggerClassName}
+              aria-label="Stats"
+            >
+              <Gauge className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Stats</span>
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="participants">
-              <ParticipantsPanel
-                selectedParticipantId={selectedParticipantId}
-                boardData={boardData}
-              />
-            </TabsContent>
-            <TabsContent value="teams">
-              <TeamsPanel boardData={boardData} />
-            </TabsContent>
-            <TabsContent value="badges">
-              <BadgesPanel
-                badges={boardData.badges}
-                hasFinalMatches={boardData.summary.hasFinalMatches}
-                standings={standings}
-              />
-            </TabsContent>
-            <TabsContent value="matches">
-              <MatchesPanel matches={boardData.matches} />
-            </TabsContent>
-            <TabsContent value="stats">
-              <StatsPanel
-                finalMatches={boardData.summary.finalMatchCount}
-                totalGoals={boardData.summary.totalGoals}
-                activeTeams={boardData.summary.activeTeamCount}
-                delayedMatches={boardData.summary.delayedMatchCount}
-                scheduledMatches={boardData.summary.scheduledMatchCount}
-              />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+          <TabsContent value="participants">
+            <ParticipantsPanel
+              selectedParticipantId={selectedParticipantId}
+              boardData={boardData}
+            />
+          </TabsContent>
+          <TabsContent value="teams">
+            <TeamsPanel boardData={boardData} />
+          </TabsContent>
+          <TabsContent value="badges">
+            <BadgesPanel
+              badges={boardData.badges}
+              hasFinalMatches={boardData.summary.hasFinalMatches}
+              standings={standings}
+            />
+          </TabsContent>
+          <TabsContent value="matches">
+            <MatchesPanel matches={boardData.matches} />
+          </TabsContent>
+          <TabsContent value="stats">
+            <StatsPanel
+              finalMatches={boardData.summary.finalMatchCount}
+              totalGoals={boardData.summary.totalGoals}
+              activeTeams={boardData.summary.activeTeamCount}
+              delayedMatches={boardData.summary.delayedMatchCount}
+              scheduledMatches={boardData.summary.scheduledMatchCount}
+            />
+          </TabsContent>
+        </Tabs>
+      </CampaignPanel>
     </section>
   );
 }
@@ -159,24 +185,31 @@ function ParticipantsPanel({
         {standings.map((standing, index) => (
           <motion.div
             key={standing.participantId}
-            className="rounded-lg border bg-surface-muted p-3"
+            className={`rounded-2xl p-3 ${
+              index === 0 ? "bg-campaign-blush" : "bg-campaign-page"
+            }`}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.025 }}
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-sm font-semibold text-secondary-foreground">
+                <div
+                  className={`flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
+                    index === 0 ? "bg-campaign-magenta" : "bg-campaign-purple"
+                  }`}
+                >
                   #{standing.rank}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold">{standing.name}</p>
+                  <p className="truncate font-black text-campaign-ink">
+                    {standing.name}
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {standing.teamNames.map((teamName) => (
                       <Badge
                         key={`${standing.participantId}-${teamName}`}
-                        variant="outline"
-                        className="max-w-full truncate"
+                        className="max-w-full truncate bg-white text-campaign-muted hover:bg-white"
                       >
                         {teamName}
                       </Badge>
@@ -185,8 +218,10 @@ function ParticipantsPanel({
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xl font-semibold">{standing.points}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-2xl font-black text-campaign-purple-strong">
+                  {standing.points}
+                </p>
+                <p className="text-xs font-semibold text-campaign-muted">
                   {standing.teamCount} teams
                 </p>
               </div>
@@ -203,27 +238,38 @@ function ParticipantsPanel({
           />
         ) : (
           <div
-            className="rounded-lg border border-dashed bg-surface-muted p-4"
+            className="rounded-2xl border-2 border-dashed border-campaign-ring bg-campaign-panel-soft p-4"
             aria-label="Your sweepstake"
           >
-            <div className="flex items-center gap-2 text-primary">
+            <div className="flex items-center gap-2 text-campaign-purple">
               <UserRound className="size-4" aria-hidden="true" />
-              <span className="text-xs font-medium uppercase tracking-normal">
+              <span className="text-xs font-black uppercase tracking-normal">
                 Your sweepstake
               </span>
             </div>
-            <p className="mt-3 text-lg font-semibold">Choose your name</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pick yourself above to see your teams, points, badges, and matches.
+            <p className="mt-3 text-lg font-black text-campaign-purple-strong">
+              Choose your name
+            </p>
+            <p className="mt-1 text-sm font-semibold text-campaign-muted">
+              Pick yourself above to see your teams, points, badges, and
+              matches.
             </p>
           </div>
         )}
-        <InfoTile
-          icon={<Bell className="size-4" />}
-          label="Updates"
-          value="Email optional"
-          body="No email provider is connected during this phase."
-        />
+        <CampaignPanel className="p-4" tone="yellow">
+          <div className="flex items-center gap-2 text-campaign-purple">
+            <Bell className="size-4" aria-hidden="true" />
+            <span className="text-xs font-black uppercase tracking-normal">
+              Updates
+            </span>
+          </div>
+          <p className="mt-3 text-xl font-black text-campaign-purple-strong">
+            Email optional
+          </p>
+          <p className="mt-1 text-sm font-semibold text-campaign-muted">
+            No email provider is connected during this phase.
+          </p>
+        </CampaignPanel>
       </div>
     </div>
   );
@@ -251,41 +297,61 @@ function ParticipantFocusCard({
       (match.awayTeamId != null && allocatedTeamIds.has(match.awayTeamId)),
   );
   const recentMatch = relevantMatches.find((match) => match.status === "final");
-  const upcomingMatch = relevantMatches.find((match) => match.status !== "final");
+  const upcomingMatch = relevantMatches.find(
+    (match) => match.status !== "final",
+  );
   const earnedBadges = hasFinalMatches
     ? boardData.badges
-        .filter((badge) => badge.holderParticipantIds.includes(standing.participantId))
+        .filter((badge) =>
+          badge.holderParticipantIds.includes(standing.participantId),
+        )
         .map((badge) => badge.label)
     : [];
 
   return (
-    <div className="rounded-lg border bg-surface-muted p-4" aria-label="Your sweepstake">
+    <div
+      className="rounded-2xl bg-campaign-cyan p-4"
+      aria-label="Your sweepstake"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-primary">
+          <div className="flex items-center gap-2 text-campaign-purple">
             <UserRound className="size-4" aria-hidden="true" />
-            <span className="text-xs font-medium uppercase tracking-normal">
+            <span className="text-xs font-black uppercase tracking-normal">
               Your sweepstake
             </span>
           </div>
-          <p className="mt-3 text-xl font-semibold">{standing.name}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-3 text-xl font-black text-campaign-purple-strong">
+            {standing.name}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-campaign-muted">
             Rank #{standing.rank} with {standing.points} total points.
           </p>
         </div>
-        <Badge variant={participant?.emailUpdatesEnabled ? "secondary" : "outline"}>
-          {participant?.emailUpdatesEnabled ? "Email updates on" : "No email updates"}
+        <Badge
+          className={
+            participant?.emailUpdatesEnabled
+              ? "bg-campaign-yellow text-campaign-ink hover:bg-campaign-yellow"
+              : "bg-white text-campaign-muted hover:bg-white"
+          }
+        >
+          {participant?.emailUpdatesEnabled
+            ? "Email updates on"
+            : "No email updates"}
         </Badge>
       </div>
 
       <div className="mt-4 space-y-3">
         <div>
-          <p className="text-xs font-medium text-muted-foreground">
+          <p className="text-xs font-black uppercase text-campaign-magenta">
             Allocated teams
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {allocatedTeams.map((team) => (
-              <Badge key={team.id} variant="secondary">
+              <Badge
+                key={team.id}
+                className="bg-white text-campaign-purple hover:bg-white"
+              >
                 {team.shortName}
               </Badge>
             ))}
@@ -305,11 +371,17 @@ function ParticipantFocusCard({
           />
           <ParticipantSignal
             label="Recent match"
-            value={recentMatch ? formatMatchSummary(recentMatch) : "No recent result"}
+            value={
+              recentMatch ? formatMatchSummary(recentMatch) : "No recent result"
+            }
           />
           <ParticipantSignal
             label="Next match"
-            value={upcomingMatch ? formatMatchSummary(upcomingMatch) : "No upcoming match"}
+            value={
+              upcomingMatch
+                ? formatMatchSummary(upcomingMatch)
+                : "No upcoming match"
+            }
           />
         </div>
       </div>
@@ -319,9 +391,11 @@ function ParticipantFocusCard({
 
 function ParticipantSignal({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border bg-background/70 p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
+    <div className="rounded-2xl bg-white p-3">
+      <p className="text-xs font-black uppercase text-campaign-magenta">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-campaign-ink">{value}</p>
     </div>
   );
 }
@@ -334,50 +408,56 @@ function TeamsPanel({ boardData }: { boardData: SharedBoardData }) {
     <div className="space-y-3">
       <div className="grid gap-2 sm:grid-cols-4">
         {["winner", "runner-up", "group", "quarter-final"].map((status) => (
-          <Metric
+          <CampaignMetric
             key={status}
             label={formatStatus(status)}
             value={`${teams.filter((team) => team.status === status).length}`}
           />
         ))}
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Team</TableHead>
-            <TableHead>Allocated to</TableHead>
-            {hasGroupData ? <TableHead>Group</TableHead> : null}
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Pts</TableHead>
-            <TableHead className="hidden text-right sm:table-cell">Goals for</TableHead>
-            <TableHead className="hidden text-right sm:table-cell">Goals against</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {teams.map((team) => (
-            <TableRow key={team.id}>
-              <TableCell className="font-medium">{team.name}</TableCell>
-              <TableCell>
-                {team.allocatedToName ?? "Unallocated"}
-              </TableCell>
-              {hasGroupData ? <TableCell>{team.group ?? "TBC"}</TableCell> : null}
-              <TableCell>
-                <StatusBadge status={team.status} />
-              </TableCell>
-              <TableCell className="text-right font-semibold">
-                {team.points}
-              </TableCell>
-              <TableCell className="hidden text-right sm:table-cell">
-                {team.goalsFor}
-              </TableCell>
-              <TableCell className="hidden text-right sm:table-cell">
-                {team.goalsAgainst}
-              </TableCell>
+      <div className="overflow-hidden rounded-2xl bg-campaign-panel-soft">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Team</TableHead>
+              <TableHead>Allocated to</TableHead>
+              {hasGroupData ? <TableHead>Group</TableHead> : null}
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Pts</TableHead>
+              <TableHead className="hidden text-right sm:table-cell">
+                Goals for
+              </TableHead>
+              <TableHead className="hidden text-right sm:table-cell">
+                Goals against
+              </TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <p className="text-xs text-muted-foreground">
+          </TableHeader>
+          <TableBody>
+            {teams.map((team) => (
+              <TableRow key={team.id}>
+                <TableCell className="font-medium">{team.name}</TableCell>
+                <TableCell>{team.allocatedToName ?? "Unallocated"}</TableCell>
+                {hasGroupData ? (
+                  <TableCell>{team.group ?? "TBC"}</TableCell>
+                ) : null}
+                <TableCell>
+                  <StatusBadge status={team.status} />
+                </TableCell>
+                <TableCell className="text-right font-semibold">
+                  {team.points}
+                </TableCell>
+                <TableCell className="hidden text-right sm:table-cell">
+                  {team.goalsFor}
+                </TableCell>
+                <TableCell className="hidden text-right sm:table-cell">
+                  {team.goalsAgainst}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <p className="text-xs font-semibold text-campaign-muted">
         Showing all {teams.length} cached tournament teams.
       </p>
     </div>
@@ -400,23 +480,28 @@ function BadgesPanel({
           ? badge.holderParticipantIds
               .map(
                 (participantId) =>
-                  standings.find((standing) => standing.participantId === participantId)
-                    ?.name,
+                  standings.find(
+                    (standing) => standing.participantId === participantId,
+                  )?.name,
               )
               .filter(Boolean)
           : [];
 
         return (
-          <div key={badge.id} className="rounded-lg border bg-surface-muted p-4">
+          <div key={badge.id} className="rounded-2xl bg-campaign-page p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold">{badge.label}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="font-black text-campaign-purple-strong">
+                  {badge.label}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-campaign-muted">
                   {badge.supportLine}
                 </p>
               </div>
               <Badge
-                variant={badge.status === "manual-future" ? "outline" : "secondary"}
+                variant={
+                  badge.status === "manual-future" ? "outline" : "secondary"
+                }
               >
                 {badge.status}
               </Badge>
@@ -439,40 +524,46 @@ function BadgesPanel({
 
 function MatchesPanel({ matches }: { matches: SharedBoardMatch[] }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Match</TableHead>
-          <TableHead>Participants</TableHead>
-          <TableHead className="hidden sm:table-cell">Stage</TableHead>
-          <TableHead className="hidden md:table-cell">Kickoff</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-right">Score</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {matches.map((match) => (
-          <TableRow key={match.id}>
-            <TableCell className="font-medium">
-              {match.homeTeamName} v {match.awayTeamName}
-            </TableCell>
-            <TableCell>{match.participantLabel}</TableCell>
-            <TableCell className="hidden sm:table-cell">{match.stage}</TableCell>
-            <TableCell className="hidden md:table-cell">
-              {match.kickoffLabel}
-            </TableCell>
-            <TableCell>
-              <Badge variant={match.status === "delayed" ? "outline" : "secondary"}>
-                {formatStatus(match.status)}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-right font-mono font-semibold">
-              {match.homeScore ?? "-"}:{match.awayScore ?? "-"}
-            </TableCell>
+    <div className="overflow-hidden rounded-2xl bg-campaign-panel-soft">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Match</TableHead>
+            <TableHead>Participants</TableHead>
+            <TableHead className="hidden sm:table-cell">Stage</TableHead>
+            <TableHead className="hidden md:table-cell">Kickoff</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Score</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {matches.map((match) => (
+            <TableRow key={match.id}>
+              <TableCell className="font-medium">
+                {match.homeTeamName} v {match.awayTeamName}
+              </TableCell>
+              <TableCell>{match.participantLabel}</TableCell>
+              <TableCell className="hidden sm:table-cell">
+                {match.stage}
+              </TableCell>
+              <TableCell className="hidden md:table-cell">
+                {match.kickoffLabel}
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={match.status === "delayed" ? "outline" : "secondary"}
+                >
+                  {formatStatus(match.status)}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right font-mono font-semibold">
+                {match.homeScore ?? "-"}:{match.awayScore ?? "-"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -500,30 +591,57 @@ function StatsPanel({
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      <InfoTile
-        icon={<Sparkles className="size-4" />}
+      <StatTile
+        icon={<Sparkles className="size-4" aria-hidden="true" />}
         label="Goals"
         value={`${totalGoals}`}
         body="Derived from cached match results."
       />
-      <InfoTile
-        icon={<ShieldCheck className="size-4" />}
+      <StatTile
+        icon={<ShieldCheck className="size-4" aria-hidden="true" />}
         label="Teams tracked"
         value={`${activeTeams}`}
         body="Teams currently visible in cached tournament data."
       />
-      <InfoTile
-        icon={<CalendarDays className="size-4" />}
+      <StatTile
+        icon={<CalendarDays className="size-4" aria-hidden="true" />}
         label="Finished"
         value={`${finalMatches}`}
         body="Matches with final cached scores."
       />
-      <InfoTile
-        icon={<RefreshCw className="size-4" />}
+      <StatTile
+        icon={<RefreshCw className="size-4" aria-hidden="true" />}
         label="Pending"
         value={`${scheduledMatches + delayedMatches}`}
         body="Scheduled or delayed fixtures still awaiting final cached scores."
       />
     </div>
+  );
+}
+
+function StatTile({
+  body,
+  icon,
+  label,
+  value,
+}: {
+  body: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <CampaignPanel className="p-4" tone="pink">
+      <div className="flex items-center gap-2 text-campaign-purple">
+        {icon}
+        <span className="text-xs font-black uppercase tracking-normal">
+          {label}
+        </span>
+      </div>
+      <p className="mt-3 text-xl font-black text-campaign-purple-strong">
+        {value}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-campaign-muted">{body}</p>
+    </CampaignPanel>
   );
 }

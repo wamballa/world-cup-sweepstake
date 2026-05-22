@@ -4,6 +4,8 @@
 
 Premium, polished, slick, low-friction, mobile-first, social, and tournament-ready. The app should feel easier than a spreadsheet and more exciting than a static draw.
 
+The approved high-energy visual direction is captured in `/docs/bl-091-visual-direction.md`. Use that document as the current source of truth for palette, shape language, campaign panels, header treatment, and how the BL-091 prototype direction should roll into real pages.
+
 ## Required Screens
 
 - Admin create sweepstake.

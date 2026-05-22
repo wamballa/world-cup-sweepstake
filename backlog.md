@@ -8,6 +8,8 @@ This file is the single source of truth for work item IDs and implementation sta
 
 ## To Do
 
+- `BL-094` `[ToDo]`: Add real participant shared-board search/filter behavior if retained from the BL-091 header concept, including participant and team search, mobile-friendly results or filtering, keyboard accessibility, empty results state, and Playwright coverage for finding a participant and an allocated team.
+- `BL-095` `[ToDo]`: Apply the approved BL-091 visual direction to the admin experience after the participant shared board is updated, including create/setup, participant management, allocation review, share-link, archive/delete, empty/error/loading states, and Playwright coverage for the critical mobile admin flow.
 - `BL-083` `[ToDo]`: Add an optional fairness-weighted allocation mode alongside pure random allocation, ideally using pre-tournament team strength or odds data from an approved server-side source, including data-source selection and licensing checks, normalized team strength storage, deterministic/testable weighted allocation that balances strong/weak teams across participants, clear admin mode controls, audit metadata showing the allocation mode used, and unit/Playwright coverage proving no participant receives a systematically unfair team-strength advantage.
 - `BL-084` `[ToDo]`: Add tournament team-list change detection, notification, and reallocation workflow, including storing team sync snapshots/checksums, detecting added/removed/replaced teams after football-data.org sync, flagging affected sweepstakes whose saved allocations reference changed teams, notifying admins and opted-in participants that the team list changed, disabling stale shared boards or marking them as pending review, providing an owner-only re-roll/repair allocation flow, recording audit events for team-list changes and re-rolls, and testing scenarios where a team is removed or the total team count changes after allocations already exist.
 - `BL-056` `[ToDo]`: Add MVP AI sweepstake updates.
@@ -25,6 +27,10 @@ No active WIP items.
 
 ## Done
 
+- `BL-096` `[Done]`: Replace the temporary `WC` campaign logo mark with the provided 64x64 app logo asset through the reusable `CampaignLogoMark` slot on the participant shared board and BL-091 prototype.
+- `BL-093` `[Done]`: Apply the approved BL-091 visual direction to the real participant shared-board route while preserving existing server data, tabs, auth boundaries, freshness labels, no-email-leak behavior, and current shared-link functionality; map the prototype's Players, Teams, and Updates affordances onto existing participant/team/update surfaces without adding unsupported behavior.
+- `BL-092` `[Done]`: Convert the approved BL-091 visual direction into reusable app styling foundations, including Tailwind/theme tokens or local constants for the purple/magenta/cyan/yellow palette, shared campaign panel/card/header primitives, logo slot handling for the future app mark, mobile-safe spacing/radius rules, and visual regression checks that prevent horizontal overflow.
+- `BL-091` `[Done]`: Define and apply an original high-energy shared-board design spike inspired only by the attached retail promo energy, using bold purple and magenta accents, rounded promotional panels, playful tournament graphics, dense mobile-first content blocks, punchy hierarchy, a review-only `/design/bl-091` prototype route backed by preview data, and explicit avoidance of Currys branding, logo, copy, proprietary layout, or direct brand references.
 - `BL-001` `[Done]`: Lock MVP scope for admin-created sweepstakes.
 - `BL-002` `[Done]`: Decide whether shared sweepstake links need passcodes for MVP.
 - `BL-003` `[Done]`: Decide leaderboard and badge tie handling rules.
