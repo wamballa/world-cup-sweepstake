@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type { SharedBoardData } from "@/features/shared-board/shared-board-data";
 
+import { AiSweepstakeUpdateButton } from "./ai-sweepstake-update-button";
 import { SharedScoreboard } from "./shared-scoreboard";
 
 export function ParticipantBoard({
@@ -121,6 +122,10 @@ export function ParticipantBoard({
           leadingParticipant={leadingParticipant}
         />
       </CampaignPageStack>
+      <AiSweepstakeUpdateButton
+        freshnessLabel={boardData.syncState.freshnessLabel}
+        shareToken={shareToken}
+      />
     </CampaignShell>
   );
 }

@@ -214,6 +214,25 @@ test("participant board is separated from admin controls and supports saved iden
     page.getByRole("button", { name: "Randomly allocate teams" }),
   ).not.toBeVisible();
   await expect(page.getByLabel("Move to")).not.toBeVisible();
+  await expect(page.getByLabel("Open AI sweepstake update")).toBeVisible();
+  await page.getByLabel("Open AI sweepstake update").click();
+  await expect(
+    page.getByRole("dialog").getByText("Sweepstake pulse check"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog").getByText("Generated from cached sweepstake data"),
+  ).toBeVisible();
+  await expect(page.getByRole("dialog").getByText("Building the latest AI update")).not.toBeVisible({
+    timeout: 10_000,
+  });
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await page.getByLabel("Open AI sweepstake update").click();
+  await expect(
+    page.getByRole("dialog").getByText("Sweepstake pulse check"),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).not.toBeVisible();
 
   await expect(page.getByLabel("Your sweepstake")).toContainText(
     "Choose your name",

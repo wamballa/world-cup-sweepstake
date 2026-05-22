@@ -31,6 +31,7 @@ describe("Phase 4 Supabase migration contract", () => {
       "badge_holders",
       "football_data_sync_runs",
       "football_data_sync_state",
+      "ai_generations",
     ].forEach((table) => {
       expect(migration).toContain(`create table public.${table}`);
     });
@@ -82,5 +83,26 @@ describe("Phase 4 Supabase migration contract", () => {
     expect(syncPolicies).toBeNull();
     expect(migration).toContain('create policy "email logs admin read"');
     expect(migration).toContain('create policy "ai generations admin read"');
+  });
+});
+
+const aiCacheMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260522140000_ai_generation_cache_key.sql",
+  ),
+  "utf8",
+);
+
+describe("AI generation cache migration contract", () => {
+  it("deduplicates AI generations by sweepstake, feature, and input hash", () => {
+    expect(aiCacheMigration).toContain(
+      "ai_generations_sweepstake_feature_hash_idx",
+    );
+    expect(aiCacheMigration).toContain(
+      "on public.ai_generations(sweepstake_id, feature_key, input_hash)",
+    );
   });
 });

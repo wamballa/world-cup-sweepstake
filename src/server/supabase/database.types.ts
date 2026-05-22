@@ -43,6 +43,29 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["allocation_audit_events"]["Insert"]>;
       };
+      ai_generations: {
+        Row: {
+          id: string;
+          sweepstake_id: string;
+          feature_key: string;
+          input_hash: string;
+          source_updated_at: string | null;
+          model: string;
+          output_text: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          sweepstake_id: string;
+          feature_key: string;
+          input_hash: string;
+          source_updated_at?: string | null;
+          model: string;
+          output_text: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ai_generations"]["Insert"]>;
+      };
       badge_categories: {
         Row: {
           id: string;
