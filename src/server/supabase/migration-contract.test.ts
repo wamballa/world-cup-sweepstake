@@ -96,6 +96,16 @@ const aiCacheMigration = readFileSync(
   "utf8",
 );
 
+const historicalTournamentMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260523120000_historical_world_cup_tournaments.sql",
+  ),
+  "utf8",
+);
+
 describe("AI generation cache migration contract", () => {
   it("deduplicates AI generations by sweepstake, feature, and input hash", () => {
     expect(aiCacheMigration).toContain(
@@ -103,6 +113,23 @@ describe("AI generation cache migration contract", () => {
     );
     expect(aiCacheMigration).toContain(
       "on public.ai_generations(sweepstake_id, feature_key, input_hash)",
+    );
+  });
+});
+
+describe("Historical World Cup tournament migration contract", () => {
+  it("scopes football-data external IDs by tournament season and records reset audits", () => {
+    expect(historicalTournamentMigration).toContain(
+      "drop constraint if exists teams_external_id_key",
+    );
+    expect(historicalTournamentMigration).toContain(
+      "on public.teams(tournament_code, external_id)",
+    );
+    expect(historicalTournamentMigration).toContain(
+      "on public.matches(tournament_code, external_id)",
+    );
+    expect(historicalTournamentMigration).not.toContain(
+      "add value if not exists 'tournament_reset'",
     );
   });
 });

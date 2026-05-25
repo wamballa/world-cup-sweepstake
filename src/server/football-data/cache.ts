@@ -23,31 +23,56 @@ type MatchLookup = Map<string, string>;
 export async function cacheFootballData(
   supabase: SupabaseClient,
   input: FootballDataCacheInput,
+  options?: { tournamentCode?: string },
 ) {
+  const tournamentCode =
+    options?.tournamentCode ??
+    input.teams[0]?.tournament_code ??
+    input.matches[0]?.tournament_code ??
+    footballDataConfig.tournamentCode;
+
   if (input.teams.length > 0) {
     const { error } = await supabase.from("teams").upsert(input.teams, {
-      onConflict: "external_id",
+      onConflict: "tournament_code,external_id",
     });
 
     if (error) {
-      throw error;
+      if (!isMissingCompositeConflictError(error)) {
+        throw error;
+      }
+
+      await upsertRowsByTournamentExternalId(
+        supabase,
+        "teams",
+        input.teams,
+        tournamentCode,
+      );
     }
   }
 
-  const teamIdsByExternalId = await loadTeamLookup(supabase);
+  const teamIdsByExternalId = await loadTeamLookup(supabase, tournamentCode);
   const matchInserts = buildMatchInserts(input.matches, teamIdsByExternalId);
 
   if (matchInserts.length > 0) {
     const { error } = await supabase.from("matches").upsert(matchInserts, {
-      onConflict: "external_id",
+      onConflict: "tournament_code,external_id",
     });
 
     if (error) {
-      throw error;
+      if (!isMissingCompositeConflictError(error)) {
+        throw error;
+      }
+
+      await upsertRowsByTournamentExternalId(
+        supabase,
+        "matches",
+        matchInserts,
+        tournamentCode,
+      );
     }
   }
 
-  const matchIdsByExternalId = await loadMatchLookup(supabase);
+  const matchIdsByExternalId = await loadMatchLookup(supabase, tournamentCode);
   const statInserts = buildTeamMatchStatInserts(
     input.teamStats,
     teamIdsByExternalId,
@@ -124,14 +149,95 @@ export function buildTeamMatchStatInserts(
   });
 }
 
+type TournamentExternalRow = {
+  external_id: string;
+  tournament_code: string;
+  [key: string]: unknown;
+};
+
+export function isMissingCompositeConflictError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error != null &&
+    "code" in error &&
+    error.code === "42P10"
+  );
+}
+
+async function upsertRowsByTournamentExternalId(
+  supabase: SupabaseClient,
+  table: string,
+  rows: TournamentExternalRow[],
+  tournamentCode: string,
+) {
+  const externalIds = [...new Set(rows.map((row) => row.external_id))];
+  const { data: existingRows, error: lookupError } = await supabase
+    .from(table)
+    .select("id, external_id")
+    .eq("tournament_code", tournamentCode)
+    .in("external_id", externalIds);
+
+  if (lookupError) {
+    throw lookupError;
+  }
+
+  const existingIdByExternalId = new Map(
+    (existingRows ?? []).map((row) => [
+      String(row.external_id),
+      String(row.id),
+    ]),
+  );
+  const inserts: TournamentExternalRow[] = [];
+
+  for (const row of rows) {
+    const existingId = existingIdByExternalId.get(row.external_id);
+
+    if (!existingId) {
+      inserts.push(row);
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from(table)
+      .update(row)
+      .eq("id", existingId);
+
+    if (updateError) {
+      throw updateError;
+    }
+  }
+
+  if (inserts.length === 0) {
+    return;
+  }
+
+  const { error: insertError } = await supabase.from(table).insert(inserts);
+
+  if (insertError) {
+    throw insertError;
+  }
+}
+
 export async function createSyncRun(
   supabase: SupabaseClient,
   metadata: Json,
 ) {
+  const metadataRecord =
+    typeof metadata === "object" && metadata != null && !Array.isArray(metadata)
+      ? (metadata as Record<string, Json>)
+      : {};
+  const tournamentCode =
+    typeof metadataRecord.tournamentCode === "string"
+      ? metadataRecord.tournamentCode
+      : footballDataConfig.tournamentCode;
+  const competitionCode =
+    typeof metadataRecord.competitionCode === "string"
+      ? metadataRecord.competitionCode
+      : footballDataConfig.competitionCode;
   const { data, error } = await supabase
     .from("football_data_sync_runs")
     .insert({
-      endpoint: "competitions/WC/teams+matches",
+      endpoint: `competitions/${competitionCode}/teams+matches:${tournamentCode}`,
       status: "started",
       metadata,
     })
@@ -174,6 +280,7 @@ export async function finishSyncRun(
 export async function updateSyncState(
   supabase: SupabaseClient,
   input: {
+    tournamentCode?: string;
     runId: string;
     lastSuccessfulSyncAt: string;
     metadata: Json;
@@ -181,7 +288,7 @@ export async function updateSyncState(
 ) {
   const { error } = await supabase.from("football_data_sync_state").upsert(
     {
-      key: footballDataConfig.tournamentCode,
+      key: input.tournamentCode ?? footballDataConfig.tournamentCode,
       last_successful_sync_at: input.lastSuccessfulSyncAt,
       last_run_id: input.runId,
       metadata: input.metadata,
@@ -197,11 +304,11 @@ export async function updateSyncState(
   }
 }
 
-async function loadTeamLookup(supabase: SupabaseClient) {
+async function loadTeamLookup(supabase: SupabaseClient, tournamentCode: string) {
   const { data, error } = await supabase
     .from("teams")
     .select("id, external_id")
-    .eq("tournament_code", footballDataConfig.tournamentCode);
+    .eq("tournament_code", tournamentCode);
 
   if (error) {
     throw error;
@@ -214,11 +321,11 @@ async function loadTeamLookup(supabase: SupabaseClient) {
   );
 }
 
-async function loadMatchLookup(supabase: SupabaseClient) {
+async function loadMatchLookup(supabase: SupabaseClient, tournamentCode: string) {
   const { data, error } = await supabase
     .from("matches")
     .select("id, external_id")
-    .eq("tournament_code", footballDataConfig.tournamentCode);
+    .eq("tournament_code", tournamentCode);
 
   if (error) {
     throw error;

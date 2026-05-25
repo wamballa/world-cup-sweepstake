@@ -7,7 +7,20 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceRoleClient } from "@/server/supabase/client";
 import { requireSweepstakeAdmin } from "@/server/supabase/admin-auth";
 import type { TeamAllocation } from "@/features/allocation/fair-allocation";
+import { prepareBulkParticipantCreate } from "@/features/participants/bulk-participant-parser";
 import { recalculateSweepstakeScores } from "@/server/football-data/recalculate";
+import { runFootballDataSync } from "@/server/football-data/sync";
+import {
+  defaultFootballDataTournament,
+  getFootballDataTournamentByCode,
+  isSupportedFootballDataTournamentCode,
+} from "@/features/tournaments/world-cup";
+import {
+  buildTournamentChangePatch,
+  buildHistoricalTournamentSyncFailureMessage,
+  buildTournamentResetAuditInsert,
+  tournamentDependentSweepstakeTables,
+} from "@/server/sweepstakes/tournament-change";
 
 type LooseSupabaseClient = {
   from: (table: string) => {
@@ -39,6 +52,8 @@ const sweepstakeAdminsTable = "sweepstake_admins" as string;
 const sweepstakesTable = "sweepstakes" as string;
 const teamAllocationsTable = "team_allocations" as string;
 const allocationAuditEventsTable = "allocation_audit_events" as string;
+const sharedViewModes = ["participant_board", "countdown"] as const;
+type SharedViewMode = (typeof sharedViewModes)[number];
 
 const defaultBadgeCategories = [
   { key: "first-place", label: "1st Place" },
@@ -106,7 +121,7 @@ export async function createOwnedSweepstake(name: string) {
     .insert([
       {
         name: name.trim(),
-        tournament_code: "WC_2026",
+        tournament_code: defaultFootballDataTournament.code,
         status: "draft",
         share_token: createShareToken(),
         created_by: user.id,
@@ -147,7 +162,7 @@ export async function createOwnedSweepstake(name: string) {
     throw badgeError;
   }
 
-  const teams = await loadDrawTeams();
+  const teams = await loadDrawTeams(defaultFootballDataTournament.code);
 
   revalidatePath("/admin");
 
@@ -155,12 +170,111 @@ export async function createOwnedSweepstake(name: string) {
     id: String(sweepstake.id),
     name: String(sweepstake.name),
     shareToken: String(sweepstake.share_token),
+    tournamentCode: defaultFootballDataTournament.code,
+    tournamentLabel: defaultFootballDataTournament.label,
+    sharedViewMode: "participant_board" as const,
     isOwner: true,
     participants: [],
     adminEmails: "",
     teams,
     allocations: [],
     auditEvents: [],
+  };
+}
+
+export async function changeSweepstakeTournament(input: {
+  sweepstakeId: string;
+  tournamentCode: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const user = await requireCurrentUser();
+
+  await requireSweepstakeAdmin(supabase, user.id, input.sweepstakeId);
+
+  if (!isSupportedFootballDataTournamentCode(input.tournamentCode)) {
+    return {
+      ok: false,
+      message: "Choose a supported tournament dataset.",
+    };
+  }
+
+  const { data: sweepstake, error: sweepstakeError } = await supabase
+    .from(sweepstakesTable)
+    .select("tournament_code")
+    .eq("id", input.sweepstakeId)
+    .single();
+
+  if (sweepstakeError) {
+    throw sweepstakeError;
+  }
+
+  const previousTournament = getFootballDataTournamentByCode(
+    String(sweepstake.tournament_code),
+  );
+  const nextTournament = getFootballDataTournamentByCode(input.tournamentCode);
+
+  if (previousTournament.code === nextTournament.code) {
+    return {
+      ok: true,
+      tournamentCode: nextTournament.code,
+      tournamentLabel: nextTournament.label,
+      teams: await loadDrawTeams(nextTournament.code),
+      message: "",
+    };
+  }
+
+  const syncWarning = await ensureTournamentCache(nextTournament.code);
+  const nextTeams = await loadDrawTeams(nextTournament.code);
+
+  if (nextTeams.length === 0) {
+    return {
+      ok: false,
+      message:
+        syncWarning ||
+        `No cached teams are available for ${nextTournament.label}. The sweepstake is still using ${previousTournament.label}; no draw was reset.`,
+    };
+  }
+
+  const serviceSupabase =
+    getSupabaseServiceRoleClient() as unknown as LooseSupabaseClient;
+
+  for (const table of tournamentDependentSweepstakeTables) {
+    await deleteSweepstakeRows(serviceSupabase, table, input.sweepstakeId);
+  }
+
+  const { error: updateError } = await supabase
+    .from(sweepstakesTable)
+    .update(buildTournamentChangePatch(nextTournament.code))
+    .eq("id", input.sweepstakeId);
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  const auditInsert = buildTournamentResetAuditInsert({
+    sweepstakeId: input.sweepstakeId,
+    actorUserId: user.id,
+    previousTournamentCode: previousTournament.code,
+    previousTournamentLabel: previousTournament.label,
+    nextTournamentCode: nextTournament.code,
+    nextTournamentLabel: nextTournament.label,
+  });
+  const { error: auditError } = await supabase
+    .from(allocationAuditEventsTable)
+    .insert(auditInsert);
+
+  if (auditError) {
+    throw auditError;
+  }
+
+  revalidatePath("/admin");
+
+  return {
+    ok: true,
+    tournamentCode: nextTournament.code,
+    tournamentLabel: nextTournament.label,
+    teams: nextTeams,
+    message: syncWarning,
   };
 }
 
@@ -232,6 +346,64 @@ export async function createSweepstakeParticipant(input: {
     name: String(participantRow.display_name),
     email,
   };
+}
+
+export async function createSweepstakeParticipantsBulk(input: {
+  sweepstakeId: string;
+  names: string[];
+}) {
+  const supabase = await createSupabaseServerClient();
+  const user = await requireCurrentUser();
+
+  await requireSweepstakeAdmin(supabase, user.id, input.sweepstakeId);
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from(participantsTable)
+    .select("display_name, sort_order")
+    .eq("sweepstake_id", input.sweepstakeId);
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  const bulkParticipantCreate = prepareBulkParticipantCreate({
+    existingParticipants: (existingRows ?? []).map((participant) => {
+      const sortOrder = Number(participant.sort_order);
+
+      return {
+        displayName: String(participant.display_name),
+        sortOrder: Number.isFinite(sortOrder) ? sortOrder : null,
+      };
+    }),
+    names: input.names,
+  });
+
+  if (bulkParticipantCreate.names.length === 0) {
+    return [];
+  }
+
+  const { data: participantRows, error: participantError } = await supabase
+    .from(participantsTable)
+    .insert(
+      bulkParticipantCreate.names.map((name, index) => ({
+        sweepstake_id: input.sweepstakeId,
+        display_name: name,
+        sort_order: bulkParticipantCreate.nextSortOrder + index,
+      })),
+    )
+    .select("id, display_name");
+
+  if (participantError) {
+    throwParticipantWriteError(participantError);
+  }
+
+  revalidatePath("/admin");
+
+  return (participantRows ?? []).map((participantRow) => ({
+    id: String(participantRow.id),
+    name: String(participantRow.display_name),
+    email: "",
+  }));
 }
 
 export async function updateSweepstakeParticipant(input: {
@@ -474,6 +646,45 @@ export async function saveSweepstakeSettings(input: {
   revalidatePath("/admin");
 }
 
+export async function saveSweepstakeSharedViewMode(input: {
+  sweepstakeId: string;
+  sharedViewMode: SharedViewMode;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const user = await requireCurrentUser();
+
+  await requireSweepstakeAdmin(supabase, user.id, input.sweepstakeId);
+
+  if (!sharedViewModes.includes(input.sharedViewMode)) {
+    throw new Error("Choose a valid shared-link display mode.");
+  }
+
+  const { error } = await supabase
+    .from(sweepstakesTable)
+    .update({ shared_view_mode: input.sharedViewMode })
+    .eq("id", input.sweepstakeId);
+
+  if (error) {
+    if (isMissingSharedViewModeColumnError(error)) {
+      throw new Error(
+        "Countdown page mode is ready in the app, but the Supabase migration has not been applied yet. Apply supabase/migrations/20260524103000_shared_view_mode.sql, then try again.",
+      );
+    }
+
+    throw error;
+  }
+
+  revalidatePath("/admin");
+}
+
+function isMissingSharedViewModeColumnError(error: Error & { code?: string }) {
+  return (
+    error.code === "PGRST204" ||
+    error.code === "42703" ||
+    error.message.includes("shared_view_mode")
+  );
+}
+
 export async function saveSweepstakeAllocation(input: {
   sweepstakeId: string;
   action: "initial-draw" | "rerun" | "manual-move";
@@ -484,6 +695,11 @@ export async function saveSweepstakeAllocation(input: {
   const user = await requireCurrentUser();
 
   await requireSweepstakeAdmin(supabase, user.id, input.sweepstakeId);
+  await assertAllocationsMatchSweepstakeTournament({
+    supabase,
+    sweepstakeId: input.sweepstakeId,
+    allocations: input.allocations,
+  });
 
   const { error: deleteError } = await supabase
     .from(teamAllocationsTable)
@@ -542,6 +758,47 @@ export async function saveSweepstakeAllocation(input: {
   }
 
   revalidatePath("/admin");
+}
+
+async function assertAllocationsMatchSweepstakeTournament({
+  supabase,
+  sweepstakeId,
+  allocations,
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  sweepstakeId: string;
+  allocations: TeamAllocation[];
+}) {
+  if (allocations.length === 0) {
+    return;
+  }
+
+  const { data: sweepstake, error: sweepstakeError } = await supabase
+    .from(sweepstakesTable)
+    .select("tournament_code")
+    .eq("id", sweepstakeId)
+    .single();
+
+  if (sweepstakeError) {
+    throw sweepstakeError;
+  }
+
+  const teamIds = [...new Set(allocations.map((allocation) => allocation.teamId))];
+  const { data: teamRows, error: teamError } = await supabase
+    .from("teams")
+    .select("id")
+    .eq("tournament_code", String(sweepstake.tournament_code))
+    .in("id", teamIds);
+
+  if (teamError) {
+    throw teamError;
+  }
+
+  if ((teamRows ?? []).length !== teamIds.length) {
+    throw new Error(
+      "The saved draw uses teams from a different tournament dataset. Refresh the admin page, then run the draw again.",
+    );
+  }
 }
 
 async function requireCurrentUser() {
@@ -678,12 +935,75 @@ function toDatabaseAllocationAction(action: "initial-draw" | "rerun" | "manual-m
   return "rerun";
 }
 
-async function loadDrawTeams() {
+async function ensureTournamentCache(tournamentCode: string) {
+  const existingTeams = await loadDrawTeams(tournamentCode);
+
+  if (existingTeams.length > 0) {
+    return "";
+  }
+
+  try {
+    const result = await runFootballDataSync({
+      supabase: getSupabaseServiceRoleClient(),
+      tournamentCode,
+    });
+
+    if (result.status === "failed") {
+      return formatHistoricalSyncFailure(tournamentCode, result.errorMessage);
+    }
+
+    if (result.status === "skipped") {
+      return "Tournament dataset sync was skipped by the football-data.org cooldown. Try again shortly if teams have not appeared yet.";
+    }
+
+    return "";
+  } catch (error) {
+    return error instanceof Error
+      ? formatHistoricalSyncFailure(tournamentCode, error.message)
+      : "Tournament dataset sync could not run.";
+  }
+}
+
+function formatHistoricalSyncFailure(
+  tournamentCode: string,
+  errorMessage: string | undefined,
+) {
+  const tournament = getFootballDataTournamentByCode(tournamentCode);
+
+  if (errorMessage?.includes("403")) {
+    return buildHistoricalTournamentSyncFailureMessage({
+      tournamentLabel: tournament.label,
+      errorMessage,
+    });
+  }
+
+  return buildHistoricalTournamentSyncFailureMessage({
+    tournamentLabel: tournament.label,
+    errorMessage,
+  });
+}
+
+async function deleteSweepstakeRows(
+  supabase: LooseSupabaseClient,
+  table: string,
+  sweepstakeId: string,
+) {
+  const { error } = await supabase
+    .from(table)
+    .delete()
+    .eq("sweepstake_id", sweepstakeId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function loadDrawTeams(tournamentCode: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("teams")
     .select("id, name, short_name, group_name")
-    .eq("tournament_code", "WC_2026")
+    .eq("tournament_code", tournamentCode)
     .order("name", { ascending: true });
 
   if (error) {

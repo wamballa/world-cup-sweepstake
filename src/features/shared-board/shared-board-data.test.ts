@@ -260,6 +260,72 @@ describe("shared board data mapper", () => {
     ]);
   });
 
+  it("uses placement support copy for legacy badge category keys", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        badgeCategories: [
+          {
+            id: "legacy-first",
+            key: "first",
+            label: "1st Place",
+            status: "active",
+            sort_order: 0,
+            is_enabled: true,
+          },
+        ],
+        badgeHolders: [],
+      }),
+    );
+
+    expect(board.badges[0]).toMatchObject({
+      label: "1st Place",
+      holderParticipantIds: ["participant-1"],
+      supportLine: "Highest participant total from cached tournament data.",
+    });
+  });
+
+  it("ignores stale allocations whose teams are not in the selected tournament", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        sweepstake: {
+          id: "sweepstake-1",
+          name: "Validation Draw",
+          tournament_code: "PL_2024",
+        },
+        teams: [],
+        teamScores: [],
+        participantScores: [
+          {
+            participant_id: "participant-1",
+            points: 99,
+            rank: 1,
+            team_count: 16,
+          },
+        ],
+        allocations: [
+          {
+            participant_id: "participant-1",
+            team_id: "team-from-another-year",
+          },
+          {
+            participant_id: "participant-1",
+            team_id: "another-stale-team",
+          },
+        ],
+      }),
+    );
+
+    expect(board.teams).toEqual([]);
+    expect(board.standings[0]).toMatchObject({
+      name: "Maya",
+      points: 0,
+      teamCount: 0,
+      teamIds: [],
+      teamNames: [],
+    });
+    expect(JSON.stringify(board)).not.toContain("Unknown team");
+  });
+
   it("does not include participant email addresses in public board data", () => {
     const board = buildSharedBoardData(boardInput());
 

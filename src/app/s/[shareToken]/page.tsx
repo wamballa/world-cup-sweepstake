@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { CountdownPage } from "@/features/sweepstake-demo/countdown-page";
 import { ParticipantBoard } from "@/features/sweepstake-demo/participant-board";
 import { loadSharedBoardByShareToken } from "@/server/shared-board/load-shared-board";
 import { createPreviewSharedBoardData } from "@/server/shared-board/preview-shared-board";
@@ -26,6 +27,10 @@ export default async function SharedSweepstakePage({
 
   if (!boardData) {
     notFound();
+  }
+
+  if (boardData.sharedViewMode === "countdown") {
+    return <CountdownPage boardData={boardData} />;
   }
 
   return <ParticipantBoard shareToken={shareToken} boardData={boardData} />;

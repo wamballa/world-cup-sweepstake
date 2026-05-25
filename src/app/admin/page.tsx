@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 
 import { AppShell, type AccountSweepstake } from "@/components/app-shell";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getFootballDataTournamentByCode } from "@/features/tournaments/world-cup";
 
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient();
@@ -70,7 +71,7 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
   const supabase = await createSupabaseServerClient();
   const { data: sweepstakes, error: sweepstakesError } = await supabase
     .from("sweepstakes")
-    .select("id, name, share_token, status, created_at")
+    .select("id, name, share_token, status, tournament_code, created_at")
     .neq("status", "archived")
     .order("created_at", { ascending: false });
 
@@ -90,6 +91,7 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
     { data: allocationRows, error: allocationError },
     { data: auditRows, error: auditError },
     { data: teamRows, error: teamError },
+    viewModeResult,
   ] = await Promise.all([
     supabase
       .from("participants")
@@ -111,9 +113,13 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
       .order("created_at", { ascending: false }),
     supabase
       .from("teams")
-      .select("id, name, short_name, group_name")
-      .eq("tournament_code", "WC_2026")
+      .select("id, tournament_code, name, short_name, group_name")
+      .in(
+        "tournament_code",
+        [...new Set((sweepstakes ?? []).map((sweepstake) => sweepstake.tournament_code))],
+      )
       .order("name", { ascending: true }),
+    loadSharedViewModes(supabase, sweepstakeIds),
   ]);
 
   if (participantError) {
@@ -151,7 +157,26 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
     throw emailError;
   }
 
+  const viewModes = new Map(
+    (viewModeResult.data ?? []).map((row) => [
+      String(row.id),
+      row.shared_view_mode === "countdown"
+        ? ("countdown" as const)
+        : ("participant_board" as const),
+    ]),
+  );
+
   return (sweepstakes ?? []).map((sweepstake) => {
+    const tournament = getFootballDataTournamentByCode(sweepstake.tournament_code);
+    const teams = (teamRows ?? [])
+      .filter((team) => team.tournament_code === tournament.code)
+      .map((team) => ({
+        id: team.id,
+        name: team.name,
+        shortName: team.short_name ?? createShortTeamName(team.name),
+        groupName: team.group_name,
+      }));
+    const validTeamIds = new Set(teams.map((team) => team.id));
     const participants = (participantRows ?? [])
       .filter((participant) => participant.sweepstake_id === sweepstake.id)
       .map((participant) => ({
@@ -175,6 +200,9 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
       id: sweepstake.id,
       name: sweepstake.name,
       shareToken: sweepstake.share_token,
+      tournamentCode: tournament.code,
+      tournamentLabel: tournament.label,
+      sharedViewMode: viewModes.get(sweepstake.id) ?? "participant_board",
       isOwner: (adminRows ?? []).some(
         (admin) =>
           admin.sweepstake_id === sweepstake.id &&
@@ -183,14 +211,10 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
       ),
       participants,
       adminEmails,
-      teams: (teamRows ?? []).map((team) => ({
-        id: team.id,
-        name: team.name,
-        shortName: team.short_name ?? createShortTeamName(team.name),
-        groupName: team.group_name,
-      })),
+      teams,
       allocations: (allocationRows ?? [])
         .filter((allocation) => allocation.sweepstake_id === sweepstake.id)
+        .filter((allocation) => validTeamIds.has(allocation.team_id))
         .map((allocation) => ({
           participantId: allocation.participant_id,
           teamId: allocation.team_id,
@@ -206,6 +230,28 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
         })),
     };
   });
+}
+
+async function loadSharedViewModes(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  sweepstakeIds: string[],
+): Promise<{
+  data: Array<{ id: string; shared_view_mode: string | null }>;
+}> {
+  const { data, error } = await supabase
+    .from("sweepstakes")
+    .select("id, shared_view_mode")
+    .in("id", sweepstakeIds);
+
+  if (error && error.message.includes("shared_view_mode")) {
+    return { data: [] };
+  }
+
+  if (error) {
+    throw error;
+  }
+
+  return { data: data ?? [] };
 }
 
 function createShortTeamName(name: string) {

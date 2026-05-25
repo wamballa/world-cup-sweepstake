@@ -4,9 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Json } from "@/server/supabase/database.types";
 import { getSupabaseServiceRoleClient } from "@/server/supabase/client";
+import { getFootballDataTournamentByCode } from "@/features/tournaments/world-cup";
 
 import { cacheFootballData } from "./cache";
 import { createFootballDataClient, type FootballDataClient } from "./client";
+import { cacheTeamFlagAssets, type TeamFlagAssetResult } from "./flag-assets";
 import { normalizeFootballDataPayload } from "./normalize";
 import { recalculateAllSweepstakeScores } from "./recalculate";
 import { footballDataConfig } from "./types";
@@ -24,6 +26,7 @@ export type FootballDataSyncResult = {
   statCount: number;
   recordsChanged: number;
   recalculatedSweepstakes: number;
+  flagAssetResult?: TeamFlagAssetResult;
   errorMessage?: string;
 };
 
@@ -33,9 +36,13 @@ export async function runFootballDataSync(options?: {
   supabase?: SupabaseClient;
   client?: FootballDataClient;
   now?: () => Date;
+  tournamentCode?: string;
 }): Promise<FootballDataSyncResult> {
   const supabase = options?.supabase ?? getSupabaseServiceRoleClient();
   const now = options?.now ?? (() => new Date());
+  const tournament = getFootballDataTournamentByCode(
+    options?.tournamentCode ?? footballDataConfig.tournamentCode,
+  );
   const latestRun = await loadLatestSyncRun(supabase);
 
   if (
@@ -55,11 +62,17 @@ export async function runFootballDataSync(options?: {
     };
   }
 
-  const client = options?.client ?? createFootballDataClient();
+  const client =
+    options?.client ??
+    createFootballDataClient({
+      tournamentCode: tournament.code,
+    });
   const metadata = {
     source: "football-data.org",
-    competitionCode: footballDataConfig.competitionCode,
-    season: footballDataConfig.season,
+    competitionCode: tournament.competitionCode,
+    season: tournament.season,
+    tournamentCode: tournament.code,
+    tournamentLabel: tournament.label,
     cadence: "central-polling",
     freeTierFreshness: "delayed-scores-supported",
     minimumSyncIntervalSeconds: minimumSyncIntervalMs / 1000,
@@ -71,22 +84,30 @@ export async function runFootballDataSync(options?: {
       client.getTeams(),
       client.getMatches(),
     ]);
-    const normalized = normalizeFootballDataPayload({ teams, matches });
+    const normalized = normalizeFootballDataPayload(
+      { teams, matches },
+      tournament.code,
+    );
     const cacheResult = await cacheFootballData(supabase, {
       teams: normalized.teamRows,
       matches: normalized.matchRows,
       teamStats: normalized.teamStats,
+    }, {
+      tournamentCode: tournament.code,
     });
+    const flagAssetResult = await tryCacheTeamFlagAssets(supabase, tournament.code);
     const sourceUpdatedAt = now().toISOString();
     const recalculatedSweepstakes = await recalculateAllSweepstakeScores(
       supabase,
       sourceUpdatedAt,
+      tournament.code,
     );
     const recordsChanged =
       normalized.recordsChanged + recalculatedSweepstakes;
     const successMetadata = {
       ...metadata,
       cacheResult,
+      flagAssetResult,
       recalculatedSweepstakes,
       lastSuccessfulSyncAt: sourceUpdatedAt,
     } satisfies Json;
@@ -98,6 +119,7 @@ export async function runFootballDataSync(options?: {
       metadata: successMetadata,
     });
     await updateSyncState(supabase, {
+      tournamentCode: tournament.code,
       runId,
       lastSuccessfulSyncAt: sourceUpdatedAt,
       metadata: successMetadata,
@@ -111,10 +133,10 @@ export async function runFootballDataSync(options?: {
       statCount: cacheResult.statCount,
       recordsChanged,
       recalculatedSweepstakes,
+      flagAssetResult,
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown football data sync error";
+    const errorMessage = getCaughtErrorMessage(error);
 
     await finishSyncRun(supabase, {
       runId,
@@ -135,6 +157,56 @@ export async function runFootballDataSync(options?: {
       errorMessage,
     };
   }
+}
+
+async function tryCacheTeamFlagAssets(
+  supabase: SupabaseClient,
+  tournamentCode: string,
+) {
+  try {
+    return await cacheTeamFlagAssets(supabase, {
+      tournamentCode,
+      batchSize: getFlagAssetBatchSize(),
+    });
+  } catch (error) {
+    return {
+      attempted: 0,
+      stored: 0,
+      skipped: 0,
+      failed: 1,
+      errorMessage: getCaughtErrorMessage(error),
+    } satisfies TeamFlagAssetResult;
+  }
+}
+
+function getFlagAssetBatchSize() {
+  const configuredBatchSize = Number(process.env.FLAG_ASSET_SYNC_BATCH_SIZE);
+
+  return Number.isFinite(configuredBatchSize) && configuredBatchSize > 0
+    ? Math.floor(configuredBatchSize)
+    : 48;
+}
+
+export function getCaughtErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error != null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message
+  ) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error) {
+    return error;
+  }
+
+  return "Unknown football data sync error";
 }
 
 export function shouldSkipFootballDataSync(

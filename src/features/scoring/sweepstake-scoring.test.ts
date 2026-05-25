@@ -5,6 +5,7 @@ import {
   calculateParticipantScores,
   calculateTeamScore,
   calculateTeamScores,
+  normalizeBadgeCategoryKey,
   type BadgeCategoryInput,
   type ScoringAllocation,
   type ScoringParticipant,
@@ -217,6 +218,43 @@ describe("sweepstake scoring", () => {
     expect(
       holders.some((holder) => holder.badgeCategoryId === "badge-future"),
     ).toBe(false);
+  });
+
+  it("normalizes legacy placement badge keys for existing sweepstakes", () => {
+    expect(normalizeBadgeCategoryKey("fourth")).toBe("fourth-place");
+
+    const participantScores = calculateParticipantScores(
+      participants,
+      allocations,
+      calculateTeamScores(teams),
+    );
+    const holders = calculateBadgeHolders({
+      categories: [
+        { id: "legacy-first", key: "first", label: "1st Place" },
+        { id: "legacy-second", key: "second", label: "2nd Place" },
+        { id: "legacy-third", key: "third", label: "3rd Place" },
+      ],
+      participantScores,
+      teams,
+      allocations,
+    });
+
+    expect(holders).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          badgeCategoryId: "legacy-first",
+          participantId: "participant-a",
+        }),
+        expect.objectContaining({
+          badgeCategoryId: "legacy-second",
+          participantId: "participant-b",
+        }),
+        expect.objectContaining({
+          badgeCategoryId: "legacy-third",
+          participantId: "participant-c",
+        }),
+      ]),
+    );
   });
 });
 

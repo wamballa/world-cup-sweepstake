@@ -147,6 +147,8 @@ export async function getOrCreateSweepstakeUpdate(
 }
 
 export function buildSweepstakeUpdatePromptPayload(boardData: SharedBoardData) {
+  const competitionState = getSweepstakeUpdateCompetitionState(boardData);
+  const hasResultBackedBadges = competitionState !== "pre_tournament";
   const recentFinalMatches = boardData.matches
     .filter((match) => match.status === "final")
     .slice(-5)
@@ -175,7 +177,7 @@ export function buildSweepstakeUpdatePromptPayload(boardData: SharedBoardData) {
 
   return {
     feature: sweepstakeUpdateFeatureKey,
-    promptVersion: "2026-05-22-copy-v2",
+    promptVersion: "2026-05-24-pre-tournament-v4",
     sweepstake: {
       id: boardData.sweepstakeId,
       name: boardData.sweepstakeName,
@@ -183,6 +185,7 @@ export function buildSweepstakeUpdatePromptPayload(boardData: SharedBoardData) {
     },
     sourceUpdatedAt: boardData.syncState.lastSuccessfulSyncAt,
     freshness: boardData.syncState.freshnessLabel,
+    competitionState,
     summary: boardData.summary,
     standings: boardData.standings.slice(0, 10).map((standing) => ({
       rank: standing.rank,
@@ -203,14 +206,16 @@ export function buildSweepstakeUpdatePromptPayload(boardData: SharedBoardData) {
     badges: boardData.badges.map((badge) => ({
       label: badge.label,
       status: badge.status,
-      holders: badge.holderParticipantIds
-        .map(
-          (participantId) =>
-            boardData.participants.find(
-              (participant) => participant.id === participantId,
-            )?.name,
-        )
-        .filter(Boolean),
+      holders: hasResultBackedBadges
+        ? badge.holderParticipantIds
+            .map(
+              (participantId) =>
+                boardData.participants.find(
+                  (participant) => participant.id === participantId,
+                )?.name,
+            )
+            .filter(Boolean)
+        : [],
       supportLine: badge.supportLine,
     })),
     recentFinalMatches,
@@ -218,6 +223,18 @@ export function buildSweepstakeUpdatePromptPayload(boardData: SharedBoardData) {
     scoringRules:
       "Group win 3, group draw 1, reach Round of 16 5, reach Quarter-final 8, reach Semi-final 12, runner-up 15, World Cup winner 25.",
   };
+}
+
+function getSweepstakeUpdateCompetitionState(boardData: SharedBoardData) {
+  if (
+    !boardData.summary.hasFinalMatches &&
+    boardData.summary.finalMatchCount === 0 &&
+    boardData.summary.totalGoals === 0
+  ) {
+    return "pre_tournament";
+  }
+
+  return "in_progress_or_complete";
 }
 
 export function hashSweepstakeUpdatePayload(
@@ -230,14 +247,19 @@ export function hashSweepstakeUpdatePayload(
 
 export function createSweepstakeUpdateInstructions() {
   return [
-    "You write a short AI sweepstake update for a friendly World Cup 2026 office or group sweepstake.",
+    "You write a compact AI sweepstake update for a friendly World Cup 2026 office or group sweepstake.",
     "Use only the JSON payload supplied by the app. Do not use outside football knowledge.",
     "Do not invent scores, fixtures, lineups, injuries, form, statistics, badge holders, or standings.",
+    "Do not describe leaderboard movement or say someone is still leading unless the payload includes prior standings; prefer current-position wording.",
+    "When competitionState is pre_tournament, do not name badge holders, top spot holders, podium chasers, winners, losers, or leaderboard drama.",
+    "When competitionState is pre_tournament, say the tournament has not started from the cached results, everyone is on zero, and mention upcoming fixtures if supplied.",
     "Do not make gambling-style advice or predictions. Avoid certainty about future outcomes.",
-    "If cached data is missing, delayed, or not final, say that plainly.",
-    "Refer to freshness only as the football-data cache timestamp, not the current time or generation time.",
-    "Keep the tone punchy, warm, and lightly playful. Banter must stay kind and office-safe.",
-    "Return plain text only: 3 to 5 short bullet points plus one final football-data cache note. Do not use Markdown formatting.",
+    "If cached data is missing, delayed, awaiting first sync, or not final, say that plainly and briefly.",
+    "Refer to freshness only as the football-data cache timestamp from the payload, not the current time or generation time.",
+    "Keep the tone punchy, warm, and lightly playful. Banter must stay kind, office-safe, and never pile on one participant.",
+    "Prioritize what matters now: leader gap, podium chase, badge race, recent final results, or team points. Skip low-signal facts.",
+    "Return plain text only in this exact shape: one short headline of 8 words or fewer, then 3 to 4 bullets. Each bullet must be 18 words or fewer.",
+    "Do not add a separate cache note, sign-off, intro, or markdown heading. The app displays freshness beside the update.",
   ].join(" ");
 }
 
@@ -257,7 +279,7 @@ export async function createOpenAiResponse({
       model,
       instructions,
       input,
-      max_output_tokens: 450,
+      max_output_tokens: 260,
       store: false,
     }),
   });

@@ -1,5 +1,23 @@
 # Decision Log
 
+## 2026-05-24: Shared Link Countdown Mode
+
+Decision: Add a sweepstake-level `shared_view_mode` so the existing `/s/[shareToken]` URL can switch between the current participant board and a new countdown page after a draw exists. The countdown page uses the same cached shared-board data contract, derives the tournament countdown from the earliest cached kickoff where available, falls back to the configured World Cup 2026 start date only when needed, and shows allocations with each team's first cached match, opponent team, and participant matchup.
+
+Reason: Admins need a pre-tournament holding view without issuing a second link or changing the participant board. Keeping the switch as an admin-only sweepstake setting preserves the existing shared-link security model, avoids browser calls to football-data.org, and keeps allocations and first-match details grounded in cached app data.
+
+## 2026-05-23: BL-098 Historical Tournament Validation Mode
+
+Decision: Add configured football-data.org validation datasets for admin validation, starting with `WC_2026` and `PL_2024`. Admins can change a sweepstake's tournament dataset from Settings after a destructive confirmation; the change preserves participants and admins but clears allocations, team scores, participant scores, badge holders, AI generations, and email update logs, returns the sweepstake to draft, and records a reset audit event as `rerun` with `metadata.actionKind = "tournament_reset"`.
+
+Reason: The current football-data.org free token rejected historical World Cup seasons with 403, while the completed Premier League 2024/25 dataset is available on the free tier. That gives the team a completed 20-team validation dataset for allocation, scoring, badge, matches, and stats behavior before the upcoming 2026 tournament. Football-data.org team and match external IDs can repeat across seasons and competitions, so cache uniqueness must be scoped by `tournament_code`.
+
+## 2026-05-22: BL-097 Bulk Participant Paste Entry
+
+Decision: Reintroduce bulk participant entry as a lightweight paste helper under the existing Add participant form, accepting names only and saving new participants immediately through Supabase.
+
+Reason: Admins need a fast way to add office/group lists without returning to the older multi-state bulk import/manual-save flow removed by `BL-081`. The one-by-one add and inline edit model remains the source of truth, and added late participants must preserve existing allocations.
+
 ## 2026-05-22: BL-096 Campaign Logo Asset
 
 Decision: Copy the provided 64x64 logo asset into `public/brand/logo1-web.png` and use it through `CampaignLogoMark` on the production participant shared board and BL-091 prototype instead of the temporary `WC` initials.

@@ -6,6 +6,7 @@ import {
   BarChart3,
   Check,
   Clipboard,
+  Clock3,
   Copy,
   LayoutDashboard,
   LogOut,
@@ -60,13 +61,21 @@ import {
 } from "@/features/allocation/fair-allocation";
 import {
   archiveOwnedSweepstake,
+  changeSweepstakeTournament,
   createSweepstakeParticipant,
+  createSweepstakeParticipantsBulk,
   createOwnedSweepstake,
   deleteSweepstakeParticipant,
   saveSweepstakeAllocation,
+  saveSweepstakeSharedViewMode,
   saveSweepstakeSettings,
   updateSweepstakeParticipant,
 } from "@/app/admin/actions";
+import {
+  getDuplicateBulkParticipantNames,
+  parseBulkParticipantNames,
+} from "@/features/participants/bulk-participant-parser";
+import { footballDataTournaments } from "@/features/tournaments/world-cup";
 import { AllocationSection } from "@/features/sweepstake-demo/allocation-section";
 import {
   createPreviewShareToken,
@@ -98,6 +107,7 @@ const manualFutureBadges = [
 
 type AdminScreen = "dashboard" | "setup" | "sweepstake";
 type AdminTab = "overview" | "participants" | "draw" | "settings";
+type SharedViewMode = "participant_board" | "countdown";
 
 type AdminIdentity = {
   displayName: string;
@@ -108,6 +118,9 @@ export type AccountSweepstake = {
   id: string;
   name: string;
   shareToken: string;
+  tournamentCode: string;
+  tournamentLabel: string;
+  sharedViewMode: SharedViewMode;
   isOwner: boolean;
   participants: ParticipantDraft[];
   adminEmails: string;
@@ -144,6 +157,7 @@ export function AppShell({
   );
   const [participantName, setParticipantName] = useState("");
   const [participantEmail, setParticipantEmail] = useState("");
+  const [bulkParticipantText, setBulkParticipantText] = useState("");
   const [adminEmails, setAdminEmails] = useState(
     activeSweepstake?.adminEmails ?? "",
   );
@@ -152,6 +166,9 @@ export function AppShell({
   );
   const [auditEvents, setAuditEvents] = useState<AllocationAudit[]>(
     activeSweepstake?.auditEvents ?? [],
+  );
+  const [sharedViewMode, setSharedViewMode] = useState<SharedViewMode>(
+    activeSweepstake?.sharedViewMode ?? "participant_board",
   );
   const [moveTeamId, setMoveTeamId] = useState(
     activeSweepstake?.teams[0]?.id ?? "",
@@ -178,6 +195,7 @@ export function AppShell({
   const canAllocate =
     sweepstakeName.trim().length > 0 &&
     participants.length > 0 &&
+    teams.length > 0 &&
     duplicateNames.length === 0;
   const emailCount = participants.filter((participant) => participant.email).length;
 
@@ -190,9 +208,11 @@ export function AppShell({
     setActiveSweepstakeId(sweepstake.id);
     setSweepstakeName(sweepstake.name);
     setParticipants(sweepstake.participants);
+    setBulkParticipantText("");
     setAdminEmails(sweepstake.adminEmails);
     setAllocations(sweepstake.allocations);
     setAuditEvents(sweepstake.auditEvents);
+    setSharedViewMode(sweepstake.sharedViewMode);
     setMoveTeamId(sweepstake.allocations[0]?.teamId ?? sweepstake.teams[0]?.id ?? "");
     setMoveParticipantId(
       sweepstake.allocations[0]?.participantId ??
@@ -218,14 +238,74 @@ export function AppShell({
     setActiveSweepstakeId(createdSweepstake.id);
     setSweepstakeName(createdSweepstake.name);
     setParticipants([]);
+    setBulkParticipantText("");
     setAdminEmails("");
     setSetupName("");
     setAllocations([]);
     setAuditEvents([]);
+    setSharedViewMode(createdSweepstake.sharedViewMode);
     setMoveTeamId(createdSweepstake.teams[0]?.id ?? "");
     setMoveParticipantId("");
     setSaveStatus("Sweepstake saved to your account.");
     openSweepstake("participants");
+  }
+
+  async function changeTournamentYear(tournamentCode: string) {
+    if (!activeSweepstake || tournamentCode === activeSweepstake.tournamentCode) {
+      return;
+    }
+
+    setSaveStatus("Changing tournament dataset and resetting the draw...");
+
+    try {
+      const result = await changeSweepstakeTournament({
+        sweepstakeId: activeSweepstake.id,
+        tournamentCode,
+      });
+
+      if (
+        !result.ok ||
+        !result.tournamentCode ||
+        !result.tournamentLabel ||
+        !result.teams
+      ) {
+        setSaveStatus(result.message);
+        return;
+      }
+
+      const changedTournamentCode = result.tournamentCode;
+      const changedTournamentLabel = result.tournamentLabel;
+      const changedTeams = result.teams;
+      const note = `Tournament changed to ${changedTournamentLabel}. Existing draw and derived results were reset.`;
+      const resetAudit = createAllocationAudit("rerun", note);
+
+      setSweepstakes((current) =>
+        current.map((sweepstake) =>
+          sweepstake.id === activeSweepstake.id
+            ? {
+                ...sweepstake,
+                tournamentCode: changedTournamentCode,
+                tournamentLabel: changedTournamentLabel,
+                teams: changedTeams,
+                allocations: [],
+                auditEvents: [resetAudit, ...sweepstake.auditEvents],
+              }
+            : sweepstake,
+        ),
+      );
+      setAllocations([]);
+      setAuditEvents((current) => [resetAudit, ...current]);
+      setMoveTeamId(changedTeams[0]?.id ?? "");
+      setMoveParticipantId(participants[0]?.id ?? "");
+      setActiveTab("draw");
+      setSaveStatus(
+        result.message
+          ? `${note} ${result.message}`
+          : `${note} Run a new draw when ready.`,
+      );
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
   }
 
   async function addParticipant() {
@@ -260,6 +340,44 @@ export function AppShell({
       setParticipantEmail("");
       setSaveStatus(
         "Participant added. Existing allocations were kept. Use manual moves or rerun only if you want to change the draw.",
+      );
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
+  }
+
+  async function addBulkParticipants() {
+    const names = parseBulkParticipantNames(bulkParticipantText);
+
+    if (names.length === 0 || !activeSweepstake) {
+      return;
+    }
+
+    setSaveStatus("Saving participants...");
+
+    try {
+      const savedParticipants = await createSweepstakeParticipantsBulk({
+        sweepstakeId: activeSweepstake.id,
+        names,
+      });
+
+      setSweepstakes((current) =>
+        current.map((sweepstake) =>
+          sweepstake.id === activeSweepstake.id
+            ? {
+                ...sweepstake,
+                participants: [...sweepstake.participants, ...savedParticipants],
+              }
+            : sweepstake,
+        ),
+      );
+      setParticipants((current) => [...current, ...savedParticipants]);
+      setMoveParticipantId(
+        (current) => current || (savedParticipants[0]?.id ?? ""),
+      );
+      setBulkParticipantText("");
+      setSaveStatus(
+        `${savedParticipants.length} participants added. Existing allocations were kept.`,
       );
     } catch (error) {
       setSaveStatus(getActionErrorMessage(error));
@@ -333,26 +451,40 @@ export function AppShell({
       return;
     }
 
-    const nextAllocations = createFairAllocation(participants, teams);
-    const note = `${teams.length} teams allocated across ${participants.length} participants.`;
+    setSaveStatus("Saving allocation...");
 
-    await saveSweepstakeAllocation({
-      sweepstakeId: activeSweepstake.id,
-      action,
-      note,
-      allocations: nextAllocations,
-    });
+    try {
+      const nextAllocations = createFairAllocation(participants, teams);
+      const note = `${teams.length} teams allocated across ${participants.length} participants.`;
 
-    setAllocations(nextAllocations);
-    setMoveTeamId(nextAllocations[0]?.teamId ?? teams[0]?.id ?? "");
-    setMoveParticipantId(nextAllocations[0]?.participantId ?? participants[0]?.id ?? "");
-    setAuditEvents((current) => [
-      createAllocationAudit(
+      await saveSweepstakeAllocation({
+        sweepstakeId: activeSweepstake.id,
         action,
         note,
-      ),
-      ...current,
-    ]);
+        allocations: nextAllocations,
+      });
+
+      setAllocations(nextAllocations);
+      setSweepstakes((current) =>
+        current.map((sweepstake) =>
+          sweepstake.id === activeSweepstake.id
+            ? { ...sweepstake, allocations: nextAllocations }
+            : sweepstake,
+        ),
+      );
+      setMoveTeamId(nextAllocations[0]?.teamId ?? teams[0]?.id ?? "");
+      setMoveParticipantId(nextAllocations[0]?.participantId ?? participants[0]?.id ?? "");
+      setAuditEvents((current) => [
+        createAllocationAudit(
+          action,
+          note,
+        ),
+        ...current,
+      ]);
+      setSaveStatus(note);
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
   }
 
   async function applyManualMove() {
@@ -374,18 +506,32 @@ export function AppShell({
       participants,
     )}.`;
 
-    await saveSweepstakeAllocation({
-      sweepstakeId: activeSweepstake.id,
-      action: "manual-move",
-      note,
-      allocations: nextAllocations,
-    });
+    setSaveStatus("Saving manual move...");
 
-    setAllocations(nextAllocations);
-    setAuditEvents((current) => [
-      createAllocationAudit("manual-move", note),
-      ...current,
-    ]);
+    try {
+      await saveSweepstakeAllocation({
+        sweepstakeId: activeSweepstake.id,
+        action: "manual-move",
+        note,
+        allocations: nextAllocations,
+      });
+
+      setAllocations(nextAllocations);
+      setSweepstakes((current) =>
+        current.map((sweepstake) =>
+          sweepstake.id === activeSweepstake.id
+            ? { ...sweepstake, allocations: nextAllocations }
+            : sweepstake,
+        ),
+      );
+      setAuditEvents((current) => [
+        createAllocationAudit("manual-move", note),
+        ...current,
+      ]);
+      setSaveStatus(note);
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
   }
 
   async function copyShareLink() {
@@ -396,6 +542,36 @@ export function AppShell({
     }
 
     window.setTimeout(() => setShareCopied(false), 1600);
+  }
+
+  async function changeSharedViewMode(nextMode: SharedViewMode) {
+    if (!activeSweepstake || nextMode === sharedViewMode) {
+      return;
+    }
+
+    setSaveStatus("Updating shared link display...");
+
+    try {
+      await saveSweepstakeSharedViewMode({
+        sweepstakeId: activeSweepstake.id,
+        sharedViewMode: nextMode,
+      });
+      setSharedViewMode(nextMode);
+      setSweepstakes((current) =>
+        current.map((sweepstake) =>
+          sweepstake.id === activeSweepstake.id
+            ? { ...sweepstake, sharedViewMode: nextMode }
+            : sweepstake,
+        ),
+      );
+      setSaveStatus(
+        nextMode === "countdown"
+          ? "Shared link now opens the countdown page."
+          : "Shared link now opens the participant board.",
+      );
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
   }
 
   async function saveParticipantEdit(
@@ -495,9 +671,11 @@ export function AppShell({
     setActiveSweepstakeId("");
     setSweepstakeName("");
     setParticipants([]);
+    setBulkParticipantText("");
     setAdminEmails("");
     setAllocations([]);
     setAuditEvents([]);
+    setSharedViewMode("participant_board");
     setMoveTeamId("");
     setMoveParticipantId("");
     setSaveStatus("Sweepstake archived. Its shared link is now inactive.");
@@ -555,24 +733,30 @@ export function AppShell({
                 hasUnsavedParticipants={false}
                 moveParticipantId={moveParticipantId}
                 moveTeamId={moveTeamId}
+                bulkParticipantText={bulkParticipantText}
                 participantEmail={participantEmail}
                 participantName={participantName}
                 participants={participants}
                 shareCopied={shareCopied}
                 shareLink={shareLink}
+                sharedViewMode={sharedViewMode}
                 isOwner={activeSweepstake?.isOwner ?? false}
                 saveStatus={saveStatus}
                 spread={spread}
                 sweepstakeName={sweepstakeName}
+                tournamentCode={activeSweepstake?.tournamentCode ?? "WC_2026"}
                 teams={teams}
                 onActiveTabChange={setActiveTab}
                 onAddParticipant={addParticipant}
+                onAddBulkParticipants={addBulkParticipants}
                 onAdminEmailsChange={setAdminEmails}
                 onApplyManualMove={applyManualMove}
                 onCopyShareLink={copyShareLink}
+                onSharedViewModeChange={changeSharedViewMode}
                 onArchiveSweepstake={archiveSweepstakeFromAccount}
                 onMoveParticipantChange={setMoveParticipantId}
                 onMoveTeamChange={setMoveTeamId}
+                onBulkParticipantTextChange={setBulkParticipantText}
                 onDeleteParticipant={deleteParticipant}
                 onParticipantChange={updateParticipant}
                 onParticipantEmailDraftChange={setParticipantEmail}
@@ -581,6 +765,7 @@ export function AppShell({
                 onRunAllocation={runAllocation}
                 onSaveSettings={saveSettingsToAccount}
                 onSweepstakeNameChange={setSweepstakeName}
+                onTournamentChange={changeTournamentYear}
               />
             ) : null}
           </div>
@@ -898,22 +1083,28 @@ function SweepstakeAdminTabs({
   hasUnsavedParticipants,
   moveParticipantId,
   moveTeamId,
+  bulkParticipantText,
   participantEmail,
   participantName,
   participants,
   shareCopied,
   shareLink,
+  sharedViewMode,
   isOwner,
   saveStatus,
   spread,
   sweepstakeName,
+  tournamentCode,
   teams,
   onActiveTabChange,
   onAddParticipant,
+  onAddBulkParticipants,
   onAdminEmailsChange,
   onApplyManualMove,
   onArchiveSweepstake,
+  onBulkParticipantTextChange,
   onCopyShareLink,
+  onSharedViewModeChange,
   onDeleteParticipant,
   onMoveParticipantChange,
   onMoveTeamChange,
@@ -924,6 +1115,7 @@ function SweepstakeAdminTabs({
   onRunAllocation,
   onSaveSettings,
   onSweepstakeNameChange,
+  onTournamentChange,
 }: {
   activeTab: AdminTab;
   adminEmails: string;
@@ -935,22 +1127,28 @@ function SweepstakeAdminTabs({
   hasUnsavedParticipants: boolean;
   moveParticipantId: string;
   moveTeamId: string;
+  bulkParticipantText: string;
   participantEmail: string;
   participantName: string;
   participants: ParticipantDraft[];
   shareCopied: boolean;
   shareLink: string;
+  sharedViewMode: SharedViewMode;
   isOwner: boolean;
   saveStatus: string;
   spread: { min: number; max: number };
   sweepstakeName: string;
+  tournamentCode: string;
   teams: DrawTeam[];
   onActiveTabChange: (value: AdminTab) => void;
   onAddParticipant: () => void;
+  onAddBulkParticipants: () => void;
   onAdminEmailsChange: (value: string) => void;
   onApplyManualMove: () => void;
   onArchiveSweepstake: () => void;
+  onBulkParticipantTextChange: (value: string) => void;
   onCopyShareLink: () => void;
+  onSharedViewModeChange: (mode: SharedViewMode) => void;
   onDeleteParticipant: (participantId: string) => void;
   onMoveParticipantChange: (participantId: string) => void;
   onMoveTeamChange: (teamId: string) => void;
@@ -969,6 +1167,7 @@ function SweepstakeAdminTabs({
   onRunAllocation: (action: "initial-draw" | "rerun") => void;
   onSaveSettings: () => void;
   onSweepstakeNameChange: (value: string) => void;
+  onTournamentChange: (tournamentCode: string) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -1018,20 +1217,25 @@ function SweepstakeAdminTabs({
             participantCount={participants.length}
             shareCopied={shareCopied}
             shareLink={shareLink}
+            sharedViewMode={sharedViewMode}
             spreadLabel={`${spread.min}-${spread.max}`}
             teamCount={teams.length}
             onCopyShareLink={onCopyShareLink}
+            onSharedViewModeChange={onSharedViewModeChange}
           />
         </TabsContent>
 
         <TabsContent value="participants" className="mt-5">
           <ParticipantsTab
             duplicateNames={duplicateNames}
+            bulkParticipantText={bulkParticipantText}
             participantEmail={participantEmail}
             participantName={participantName}
             participants={participants}
             teamCount={teams.length}
             onAddParticipant={onAddParticipant}
+            onAddBulkParticipants={onAddBulkParticipants}
+            onBulkParticipantTextChange={onBulkParticipantTextChange}
             onDeleteParticipant={onDeleteParticipant}
             onParticipantChange={onParticipantChange}
             onParticipantEmailDraftChange={onParticipantEmailDraftChange}
@@ -1066,10 +1270,13 @@ function SweepstakeAdminTabs({
             adminEmails={adminEmails}
             isOwner={isOwner}
             sweepstakeName={sweepstakeName}
+            teamCount={teams.length}
+            tournamentCode={tournamentCode}
             onArchiveSweepstake={onArchiveSweepstake}
             onAdminEmailsChange={onAdminEmailsChange}
             onSaveSettings={onSaveSettings}
             onSweepstakeNameChange={onSweepstakeNameChange}
+            onTournamentChange={onTournamentChange}
           />
         </TabsContent>
       </Tabs>
@@ -1084,9 +1291,11 @@ function OverviewTab({
   participantCount,
   shareCopied,
   shareLink,
+  sharedViewMode,
   spreadLabel,
   teamCount,
   onCopyShareLink,
+  onSharedViewModeChange,
 }: {
   allocationCount: number;
   auditEventCount: number;
@@ -1094,9 +1303,11 @@ function OverviewTab({
   participantCount: number;
   shareCopied: boolean;
   shareLink: string;
+  sharedViewMode: SharedViewMode;
   spreadLabel: string;
   teamCount: number;
   onCopyShareLink: () => void;
+  onSharedViewModeChange: (mode: SharedViewMode) => void;
 }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -1139,17 +1350,53 @@ function OverviewTab({
             Share link
           </CardTitle>
           <CardDescription>
-            Read-only participant board preview, kept separate from admin tabs.
+            The same shared link can show the participant board or pre-tournament countdown page.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 sm:flex-row">
-          <div className="min-w-0 flex-1 rounded-lg border bg-surface-muted p-3">
-            <p className="break-all font-mono text-sm">{shareLink}</p>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="min-w-0 flex-1 rounded-lg border bg-surface-muted p-3">
+              <p className="break-all font-mono text-sm">{shareLink}</p>
+            </div>
+            <Button onClick={onCopyShareLink}>
+              <Copy className="size-4" aria-hidden="true" />
+              {shareCopied ? "Copied" : "Copy link"}
+            </Button>
           </div>
-          <Button onClick={onCopyShareLink}>
-            <Copy className="size-4" aria-hidden="true" />
-            {shareCopied ? "Copied" : "Copy link"}
-          </Button>
+          {allocationCount > 0 ? (
+            <div className="rounded-lg border bg-surface-muted p-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Shared link display</p>
+                  <p className="text-xs text-muted-foreground">
+                    Switch what participants see without changing the URL.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    aria-pressed={sharedViewMode === "participant_board"}
+                    onClick={() => onSharedViewModeChange("participant_board")}
+                    size="sm"
+                    variant={
+                      sharedViewMode === "participant_board" ? "default" : "outline"
+                    }
+                  >
+                    <LayoutDashboard className="size-4" aria-hidden="true" />
+                    Participant page
+                  </Button>
+                  <Button
+                    aria-pressed={sharedViewMode === "countdown"}
+                    onClick={() => onSharedViewModeChange("countdown")}
+                    size="sm"
+                    variant={sharedViewMode === "countdown" ? "default" : "outline"}
+                  >
+                    <Clock3 className="size-4" aria-hidden="true" />
+                    Countdown page
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>
@@ -1158,11 +1405,14 @@ function OverviewTab({
 
 function ParticipantsTab({
   duplicateNames,
+  bulkParticipantText,
   participantEmail,
   participantName,
   participants,
   teamCount,
   onAddParticipant,
+  onAddBulkParticipants,
+  onBulkParticipantTextChange,
   onDeleteParticipant,
   onParticipantChange,
   onParticipantEmailDraftChange,
@@ -1170,11 +1420,14 @@ function ParticipantsTab({
   onSaveParticipantEdit,
 }: {
   duplicateNames: string[];
+  bulkParticipantText: string;
   participantEmail: string;
   participantName: string;
   participants: ParticipantDraft[];
   teamCount: number;
   onAddParticipant: () => void;
+  onAddBulkParticipants: () => void;
+  onBulkParticipantTextChange: (value: string) => void;
   onDeleteParticipant: (participantId: string) => void;
   onParticipantChange: (
     participantId: string,
@@ -1189,6 +1442,28 @@ function ParticipantsTab({
     value: string,
   ) => void;
 }) {
+  const bulkParticipantNames = useMemo(
+    () => parseBulkParticipantNames(bulkParticipantText),
+    [bulkParticipantText],
+  );
+  const bulkDuplicateNames = useMemo(
+    () => getDuplicateBulkParticipantNames(bulkParticipantNames),
+    [bulkParticipantNames],
+  );
+  const existingBulkDuplicateNames = useMemo(() => {
+    const participantNames = new Set(
+      participants.map((participant) => participant.name.trim().toLowerCase()),
+    );
+
+    return bulkParticipantNames.filter((name) =>
+      participantNames.has(name.toLowerCase()),
+    );
+  }, [bulkParticipantNames, participants]);
+  const canAddBulkParticipants =
+    bulkParticipantNames.length > 0 &&
+    bulkDuplicateNames.length === 0 &&
+    existingBulkDuplicateNames.length === 0;
+
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-4">
@@ -1211,33 +1486,85 @@ function ParticipantsTab({
             Add one person at a time. Changes save to Supabase immediately.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <Input
-            aria-label="Participant name"
-            value={participantName}
-            onChange={(event) => onParticipantNameDraftChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                onAddParticipant();
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <Input
+              aria-label="Participant name"
+              value={participantName}
+              onChange={(event) => onParticipantNameDraftChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  onAddParticipant();
+                }
+              }}
+              placeholder="Name"
+            />
+            <Input
+              aria-label="Participant email"
+              type="email"
+              value={participantEmail}
+              onChange={(event) => onParticipantEmailDraftChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  onAddParticipant();
+                }
+              }}
+              placeholder="Email optional"
+            />
+            <Button disabled={!participantName.trim()} onClick={onAddParticipant}>
+              Add
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="bulk-participant-names">
+                Add several participants
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Paste comma-separated names. Emails can be added afterwards.
+              </p>
+            </div>
+            <Textarea
+              id="bulk-participant-names"
+              aria-label="Bulk participant names"
+              className="min-h-24"
+              value={bulkParticipantText}
+              onChange={(event) =>
+                onBulkParticipantTextChange(event.target.value)
               }
-            }}
-            placeholder="Name"
-          />
-          <Input
-            aria-label="Participant email"
-            type="email"
-            value={participantEmail}
-            onChange={(event) => onParticipantEmailDraftChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                onAddParticipant();
-              }
-            }}
-            placeholder="Email optional"
-          />
-          <Button disabled={!participantName.trim()} onClick={onAddParticipant}>
-            Add
-          </Button>
+              placeholder="Person One, Person Two, Person Three"
+            />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1 text-sm">
+                <p className="text-muted-foreground">
+                  {bulkParticipantNames.length === 0
+                    ? "No pasted names ready."
+                    : `${bulkParticipantNames.length} pasted ${
+                        bulkParticipantNames.length === 1 ? "name" : "names"
+                      } ready.`}
+                </p>
+                {bulkDuplicateNames.length > 0 ? (
+                  <p className="font-medium text-destructive">
+                    Duplicate pasted names: {bulkDuplicateNames.join(", ")}
+                  </p>
+                ) : null}
+                {existingBulkDuplicateNames.length > 0 ? (
+                  <p className="font-medium text-destructive">
+                    Already added: {existingBulkDuplicateNames.join(", ")}
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                disabled={!canAddBulkParticipants}
+                onClick={onAddBulkParticipants}
+              >
+                Add participants
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -1365,19 +1692,34 @@ function SettingsTab({
   adminEmails,
   isOwner,
   sweepstakeName,
+  teamCount,
+  tournamentCode,
   onArchiveSweepstake,
   onAdminEmailsChange,
   onSaveSettings,
   onSweepstakeNameChange,
+  onTournamentChange,
 }: {
   adminEmails: string;
   isOwner: boolean;
   sweepstakeName: string;
+  teamCount: number;
+  tournamentCode: string;
   onArchiveSweepstake: () => void;
   onAdminEmailsChange: (value: string) => void;
   onSaveSettings: () => void;
   onSweepstakeNameChange: (value: string) => void;
+  onTournamentChange: (tournamentCode: string) => void;
 }) {
+  const [pendingTournamentCode, setPendingTournamentCode] = useState("");
+  const pendingTournament = footballDataTournaments.find(
+    (tournament) => tournament.code === pendingTournamentCode,
+  );
+  const activeTournament =
+    footballDataTournaments.find(
+      (tournament) => tournament.code === tournamentCode,
+    ) ?? footballDataTournaments[0];
+
   return (
     <div className="space-y-5">
       <Card>
@@ -1401,12 +1743,30 @@ function SettingsTab({
           </div>
           <div className="space-y-2">
             <Label htmlFor="tournament">Tournament</Label>
-            <Input
+            <select
               id="tournament"
-              value="FIFA World Cup 2026"
-              readOnly
-              aria-readonly="true"
-            />
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={activeTournament.code}
+              onChange={(event) => {
+                const nextTournamentCode = event.target.value;
+
+                if (nextTournamentCode !== activeTournament.code) {
+                  setPendingTournamentCode(nextTournamentCode);
+                }
+              }}
+            >
+              {footballDataTournaments.map((tournament) => (
+                <option key={tournament.code} value={tournament.code}>
+                  {tournament.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Active: {activeTournament.label} with {teamCount} cached teams.
+              Validation datasets require football-data.org access; if sync is
+              rejected or rate-limited, this sweepstake stays on the active
+              dataset.
+            </p>
           </div>
           <div className="space-y-2 lg:col-span-2">
             <Label htmlFor="admin-emails">Admin emails</Label>
@@ -1422,6 +1782,41 @@ function SettingsTab({
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={Boolean(pendingTournamentCode)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingTournamentCode("");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change tournament dataset?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Changing to {pendingTournament?.label ?? "another dataset"} resets
+              this sweepstake&apos;s team draw, leaderboard scores, badge holders,
+              and cached AI/email outputs only if teams for that dataset can be
+              cached. Participants and admins are kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (pendingTournamentCode) {
+                  onTournamentChange(pendingTournamentCode);
+                  setPendingTournamentCode("");
+                }
+              }}
+            >
+              Change dataset and reset draw
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {isOwner ? (
         <Card className="border-destructive/25">
@@ -1505,6 +1900,15 @@ function SettingsTab({
 
 function getActionErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error != null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
     return error.message;
   }
 

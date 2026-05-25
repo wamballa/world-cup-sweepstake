@@ -35,6 +35,9 @@ import { formatStatus, StatusBadge } from "./demo-primitives";
 const sharedBoardTabTriggerClassName =
   "h-8 rounded-xl px-1 py-0 font-black leading-none !text-campaign-purple/65 hover:!text-campaign-purple data-active:!bg-transparent data-active:!text-campaign-purple-strong data-active:!shadow-none data-[state=active]:!bg-transparent data-[state=active]:!text-campaign-purple-strong data-[state=active]:!shadow-none [&_span]:text-inherit [&_span]:leading-none [&_svg]:text-current";
 
+const sharedBoardTableHeadClassName =
+  "bg-campaign-muted font-black text-white hover:bg-campaign-muted hover:text-white";
+
 export function SharedScoreboard({
   selectedParticipantId,
   boardData,
@@ -45,6 +48,7 @@ export function SharedScoreboard({
   leadingParticipant?: SharedBoardStanding;
 }) {
   const standings = boardData.standings;
+  const hasStarted = boardData.summary.hasFinalMatches;
 
   return (
     <section
@@ -57,34 +61,24 @@ export function SharedScoreboard({
       >
         <div className="absolute -right-12 -top-14 size-36 rounded-full bg-campaign-yellow" />
         <div className="absolute -bottom-14 left-16 size-32 rounded-full bg-campaign-cyan/80" />
-        <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-end">
+        <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_30rem] lg:items-end">
           <div className="min-w-0">
             <Badge className="bg-white text-campaign-purple hover:bg-white">
               Shared scoreboard
             </Badge>
             <h2 className="mt-3 text-4xl font-black leading-none text-white sm:text-5xl">
-              Leaderboard, teams, badges, and match updates
+              {hasStarted
+                ? "Leaderboard, teams, badges, and match updates"
+                : "Teams, badges, and match updates"}
             </h2>
             <p className="mt-3 max-w-2xl text-sm font-semibold text-white/90 sm:text-base">
               Cached tournament data. {boardData.syncState.freshnessLabel}.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <CampaignMetric
-              label="Leader"
-              value={
-                leadingParticipant?.name ?? boardData.summary.leaderName ?? "-"
-              }
-            />
-            <CampaignMetric
-              label="Finals"
-              value={`${boardData.summary.finalMatchCount}`}
-            />
-            <CampaignMetric
-              label="Delayed"
-              value={`${boardData.summary.delayedMatchCount}`}
-            />
-          </div>
+          <HeroSummaryMetrics
+            boardData={boardData}
+            leadingParticipant={leadingParticipant}
+          />
         </div>
       </CampaignPanel>
 
@@ -167,6 +161,60 @@ export function SharedScoreboard({
   );
 }
 
+function HeroSummaryMetrics({
+  boardData,
+  leadingParticipant,
+}: {
+  boardData: SharedBoardData;
+  leadingParticipant?: SharedBoardStanding;
+}) {
+  if (!boardData.summary.hasFinalMatches) {
+    return (
+      <div className="grid gap-2 sm:grid-cols-3">
+        <HeroSummaryMetric
+          label="Players"
+          value={`${boardData.participants.length}`}
+        />
+        <HeroSummaryMetric label="Teams" value={`${boardData.teams.length}`} />
+        <HeroSummaryMetric label="Status" value="Not started" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1.5fr)_1fr_1fr]">
+      <HeroSummaryMetric
+        label="Leader"
+        value={leadingParticipant?.name ?? boardData.summary.leaderName ?? "-"}
+      />
+      <HeroSummaryMetric
+        label="Finished"
+        value={`${boardData.summary.finalMatchCount}`}
+      />
+      <HeroSummaryMetric
+        label="Pending"
+        value={`${
+          boardData.summary.scheduledMatchCount +
+          boardData.summary.delayedMatchCount
+        }`}
+      />
+    </div>
+  );
+}
+
+function HeroSummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-white px-4 py-3 text-campaign-ink">
+      <p className="text-xs font-black uppercase text-campaign-magenta">
+        {label}
+      </p>
+      <p className="mt-1 whitespace-normal break-words text-xl font-black leading-tight text-campaign-purple-strong">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function ParticipantsPanel({
   selectedParticipantId,
   boardData,
@@ -206,9 +254,9 @@ function ParticipantsPanel({
                     {standing.name}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {standing.teamNames.map((teamName) => (
+                    {standing.teamNames.map((teamName, teamIndex) => (
                       <Badge
-                        key={`${standing.participantId}-${teamName}`}
+                        key={`${standing.participantId}-${standing.teamIds[teamIndex] ?? teamIndex}`}
                         className="max-w-full truncate bg-white text-campaign-muted hover:bg-white"
                       >
                         {teamName}
@@ -419,15 +467,33 @@ function TeamsPanel({ boardData }: { boardData: SharedBoardData }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Team</TableHead>
-              <TableHead>Allocated to</TableHead>
-              {hasGroupData ? <TableHead>Group</TableHead> : null}
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Pts</TableHead>
-              <TableHead className="hidden text-right sm:table-cell">
+              <TableHead className={sharedBoardTableHeadClassName}>
+                Team
+              </TableHead>
+              <TableHead className={sharedBoardTableHeadClassName}>
+                Allocated to
+              </TableHead>
+              {hasGroupData ? (
+                <TableHead className={sharedBoardTableHeadClassName}>
+                  Group
+                </TableHead>
+              ) : null}
+              <TableHead className={sharedBoardTableHeadClassName}>
+                Status
+              </TableHead>
+              <TableHead
+                className={`${sharedBoardTableHeadClassName} text-right`}
+              >
+                Pts
+              </TableHead>
+              <TableHead
+                className={`${sharedBoardTableHeadClassName} hidden text-right sm:table-cell`}
+              >
                 Goals for
               </TableHead>
-              <TableHead className="hidden text-right sm:table-cell">
+              <TableHead
+                className={`${sharedBoardTableHeadClassName} hidden text-right sm:table-cell`}
+              >
                 Goals against
               </TableHead>
             </TableRow>
@@ -528,12 +594,30 @@ function MatchesPanel({ matches }: { matches: SharedBoardMatch[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Match</TableHead>
-            <TableHead>Participants</TableHead>
-            <TableHead className="hidden sm:table-cell">Stage</TableHead>
-            <TableHead className="hidden md:table-cell">Kickoff</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Score</TableHead>
+            <TableHead className={sharedBoardTableHeadClassName}>
+              Match
+            </TableHead>
+            <TableHead className={sharedBoardTableHeadClassName}>
+              Participants
+            </TableHead>
+            <TableHead
+              className={`${sharedBoardTableHeadClassName} hidden sm:table-cell`}
+            >
+              Stage
+            </TableHead>
+            <TableHead
+              className={`${sharedBoardTableHeadClassName} hidden md:table-cell`}
+            >
+              Kickoff
+            </TableHead>
+            <TableHead className={sharedBoardTableHeadClassName}>
+              Status
+            </TableHead>
+            <TableHead
+              className={`${sharedBoardTableHeadClassName} text-right`}
+            >
+              Score
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

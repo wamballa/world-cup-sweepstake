@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMatchInserts,
   buildTeamMatchStatInserts,
+  isMissingCompositeConflictError,
 } from "./cache";
 
 describe("football-data cache builders", () => {
@@ -73,5 +74,15 @@ describe("football-data cache builders", () => {
         raw_payload: {},
       },
     ]);
+  });
+
+  it("detects hosted databases missing tournament-scoped conflict indexes", () => {
+    expect(
+      isMissingCompositeConflictError({
+        code: "42P10",
+        message: "there is no unique or exclusion constraint matching",
+      }),
+    ).toBe(true);
+    expect(isMissingCompositeConflictError({ code: "23505" })).toBe(false);
   });
 });

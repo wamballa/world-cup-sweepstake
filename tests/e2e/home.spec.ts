@@ -34,22 +34,32 @@ test("admin can use dashboard, setup flow, sweepstake tabs, and draw teams", asy
   await expect(page.getByRole("tab", { name: "Draw" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Settings" })).toBeVisible();
 
-  for (const participantName of [
-    "Maya",
-    "Alex",
+  await page
+    .getByLabel("Bulk participant names")
+    .fill("Maya, Alex, Ibrahim");
+  await expect(page.getByText("3 pasted names ready.")).toBeVisible();
+  await page.getByRole("button", { name: "Add participants" }).click();
+  await expect(page.getByText("3 participants added.")).toBeVisible();
+  await expect(page.getByLabel("Bulk participant names")).toHaveValue("");
+  await expect(page.getByLabel("Participant name for Maya")).toHaveValue("Maya");
+  await expect(page.getByLabel("Participant name for Alex")).toHaveValue("Alex");
+  await expect(page.getByLabel("Participant name for Ibrahim")).toHaveValue(
     "Ibrahim",
-    "Theo",
-    "Nia",
-    "Grace",
-    "Sam",
-    "Priya",
-  ]) {
+  );
+
+  await page.getByLabel("Bulk participant names").fill("Theo, Theo");
+  await expect(page.getByText("Duplicate pasted names: Theo")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add participants" })).toBeDisabled();
+  await page.getByLabel("Bulk participant names").fill("");
+
+  for (const participantName of ["Theo", "Nia", "Grace", "Sam", "Priya"]) {
     await page.getByLabel("Participant name").fill(participantName);
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.getByText("Participant added.")).toBeVisible();
   }
 
   await expect(page.getByText("Bulk import")).not.toBeVisible();
+  await expect(page.getByText("Add several participants")).toBeVisible();
   await expect(page.getByRole("button", { name: "Save edits" })).not.toBeVisible();
   await expect(page.getByText(/Participants 8\/\d+/)).toBeVisible();
   await expect(page.getByLabel("Participant name for Maya")).toHaveValue("Maya");
@@ -84,6 +94,17 @@ test("admin can use dashboard, setup flow, sweepstake tabs, and draw teams", asy
   await page.getByLabel("Admin emails").fill("ops@example.com");
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved to your account.")).toBeVisible();
+  await page
+    .getByLabel("Tournament")
+    .selectOption({ label: "Premier League 2024/25 validation" });
+  await expect(page.getByText("Change tournament dataset?")).toBeVisible();
+  await expect(
+    page.getByText(
+      "this sweepstake's team draw, leaderboard scores, badge holders, and cached AI/email outputs",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByText("Change tournament dataset?")).not.toBeVisible();
 
   await page.getByRole("tab", { name: "Draw" }).click();
   await expect(
@@ -98,6 +119,11 @@ test("admin can use dashboard, setup flow, sweepstake tabs, and draw teams", asy
   ).toBeVisible();
 
   await page.getByRole("tab", { name: "Participants" }).click();
+  await page
+    .getByLabel("Bulk participant names")
+    .fill("Late One, Late Two");
+  await page.getByRole("button", { name: "Add participants" }).click();
+  await expect(page.getByText("2 participants added.")).toBeVisible();
   await page
     .locator('input[aria-label^="Participant name for"]')
     .nth(7)
@@ -220,7 +246,7 @@ test("participant board is separated from admin controls and supports saved iden
     page.getByRole("dialog").getByText("Sweepstake pulse check"),
   ).toBeVisible();
   await expect(
-    page.getByRole("dialog").getByText("Generated from cached sweepstake data"),
+    page.getByRole("dialog").getByText("Cached sweepstake data"),
   ).toBeVisible();
   await expect(page.getByRole("dialog").getByText("Building the latest AI update")).not.toBeVisible({
     timeout: 10_000,

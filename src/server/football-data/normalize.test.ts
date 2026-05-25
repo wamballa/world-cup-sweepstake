@@ -9,7 +9,13 @@ import type { FootballDataSyncPayload } from "./types";
 const payload: FootballDataSyncPayload = {
   teams: {
     teams: [
-      { id: 101, name: "Aurora Republic", shortName: "Aurora", tla: "AUR" },
+      {
+        id: 101,
+        name: "Aurora Republic",
+        shortName: "Aurora",
+        tla: "AUR",
+        area: { flag: "https://crests.football-data.org/101.svg" },
+      },
       { id: 102, name: "Bayside Union", shortName: "Bayside", tla: "BAY" },
     ],
   },
@@ -63,6 +69,7 @@ describe("football-data normalization", () => {
         name: "Aurora Republic",
         short_name: "AUR",
         group_name: null,
+        flag_source_url: "https://crests.football-data.org/101.svg",
       },
       {
         external_id: "102",
@@ -70,6 +77,7 @@ describe("football-data normalization", () => {
         name: "Bayside Union",
         short_name: "BAY",
         group_name: null,
+        flag_source_url: null,
       },
     ]);
     expect(normalized.matchRows[0]).toMatchObject({
@@ -99,6 +107,19 @@ describe("football-data normalization", () => {
         goals_for: 1,
         goals_against: 2,
       }),
+    ]);
+  });
+
+  it("normalizes rows under a selected validation tournament code", () => {
+    const normalized = normalizeFootballDataPayload(payload, "PL_2024");
+
+    expect(normalized.teamRows).toEqual([
+      expect.objectContaining({ external_id: "101", tournament_code: "PL_2024" }),
+      expect.objectContaining({ external_id: "102", tournament_code: "PL_2024" }),
+    ]);
+    expect(normalized.matchRows).toEqual([
+      expect.objectContaining({ external_id: "5001", tournament_code: "PL_2024" }),
+      expect.objectContaining({ external_id: "5002", tournament_code: "PL_2024" }),
     ]);
   });
 });

@@ -45,6 +45,7 @@ export function createPreviewSharedBoardData(): SharedBoardData {
       goalsAgainst: team.goalsAgainst,
       allocatedTo: team.allocatedTo,
       allocatedToName: allocatedParticipant?.name ?? null,
+      flagAssetPath: null,
     };
   });
   const matches = mockMatches.map((match) => ({
@@ -72,6 +73,7 @@ export function createPreviewSharedBoardData(): SharedBoardData {
     sweepstakeId: "preview",
     sweepstakeName: previewSweepstakeName,
     tournamentCode: "WC_2026",
+    sharedViewMode: "participant_board",
     participants,
     standings,
     teams,

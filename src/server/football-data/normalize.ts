@@ -7,9 +7,16 @@ import {
   type NormalizedTeamRow,
 } from "./types";
 
-export function normalizeFootballDataPayload(payload: FootballDataSyncPayload) {
-  const teamRows = payload.teams.teams.map(normalizeTeam);
-  const matchRows = payload.matches.matches.map(normalizeMatch);
+export function normalizeFootballDataPayload(
+  payload: FootballDataSyncPayload,
+  tournamentCode: string = footballDataConfig.tournamentCode,
+) {
+  const teamRows = payload.teams.teams.map((team) =>
+    normalizeTeam(team, tournamentCode),
+  );
+  const matchRows = payload.matches.matches.map((match) =>
+    normalizeMatch(match, tournamentCode),
+  );
   const teamStats = payload.matches.matches.flatMap(normalizeTeamMatchStats);
 
   return {
@@ -26,23 +33,30 @@ export function normalizeTeam(team: {
   shortName?: string | null;
   tla?: string | null;
   group?: string | null;
-}): NormalizedTeamRow {
+  area?: {
+    flag?: string | null;
+  } | null;
+}, tournamentCode: string = footballDataConfig.tournamentCode): NormalizedTeamRow {
   return {
     external_id: String(team.id),
-    tournament_code: footballDataConfig.tournamentCode,
+    tournament_code: tournamentCode,
     name: team.name,
     short_name: team.tla ?? team.shortName ?? null,
     group_name: team.group ?? null,
+    flag_source_url: normalizeFlagUrl(team.area?.flag),
   };
 }
 
-export function normalizeMatch(match: FootballDataMatch): NormalizedMatchRow {
+export function normalizeMatch(
+  match: FootballDataMatch,
+  tournamentCode: string = footballDataConfig.tournamentCode,
+): NormalizedMatchRow {
   const status = mapMatchStatus(match.status);
   const score = getDisplayScore(match);
 
   return {
     external_id: String(match.id),
-    tournament_code: footballDataConfig.tournamentCode,
+    tournament_code: tournamentCode,
     stage: match.stage,
     status,
     home_team_external_id:
@@ -138,4 +152,18 @@ function getDisplayScore(match: FootballDataMatch) {
   return match.score.fullTime.home == null && match.score.regularTime
     ? match.score.regularTime
     : match.score.fullTime;
+}
+
+function normalizeFlagUrl(flagUrl: string | null | undefined) {
+  if (!flagUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(flagUrl);
+
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }

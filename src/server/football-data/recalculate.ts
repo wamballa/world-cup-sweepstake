@@ -6,8 +6,8 @@ import {
   calculateBadgeHolders,
   calculateParticipantScores,
   calculateTeamScores,
+  normalizeBadgeCategoryKey,
   type BadgeCategoryInput,
-  type BadgeCategoryKey,
   type ScoringAllocation,
   type ScoringParticipant,
   type TeamPerformanceInput,
@@ -34,45 +34,58 @@ type CachedMatch = {
   kickoff_at: string | null;
 };
 
-const badgeKeys = new Set<BadgeCategoryKey>([
-  "first-place",
-  "second-place",
-  "third-place",
-  "fourth-place",
-  "wooden-spoon",
-  "first-knocked-out",
-  "most-goals-conceded",
-  "fewest-goals-scored",
-  "most-cards",
-]);
-
 export async function recalculateAllSweepstakeScores(
   supabase: SupabaseClient,
   sourceUpdatedAt: string,
+  tournamentCode?: string,
 ) {
-  const { data: sweepstakes, error: sweepstakesError } = await supabase
+  let sweepstakesQuery = supabase
     .from("sweepstakes")
-    .select("id");
+    .select("id, tournament_code");
+
+  if (tournamentCode) {
+    sweepstakesQuery = sweepstakesQuery.eq("tournament_code", tournamentCode);
+  }
+
+  const { data: sweepstakes, error: sweepstakesError } = await sweepstakesQuery;
 
   if (sweepstakesError) {
     throw sweepstakesError;
   }
 
-  const teams = await loadCachedTeams(supabase);
-  const matches = await loadCachedMatches(supabase);
-  const teamPerformances = buildTeamPerformances(teams, matches);
-  const teamScores = calculateTeamScores(teamPerformances);
+  const cachedInputsByTournament = new Map<
+    string,
+    {
+      teamPerformances: TeamPerformanceInput[];
+      teamScores: ReturnType<typeof calculateTeamScores>;
+    }
+  >();
 
   let recalculatedCount = 0;
 
   for (const sweepstake of sweepstakes ?? []) {
+    const sweepstakeTournamentCode =
+      sweepstake.tournament_code ?? footballDataConfig.tournamentCode;
+    let cachedInputs = cachedInputsByTournament.get(sweepstakeTournamentCode);
+
+    if (!cachedInputs) {
+      const teams = await loadCachedTeams(supabase, sweepstakeTournamentCode);
+      const matches = await loadCachedMatches(supabase, sweepstakeTournamentCode);
+      const teamPerformances = buildTeamPerformances(teams, matches);
+      cachedInputs = {
+        teamPerformances,
+        teamScores: calculateTeamScores(teamPerformances),
+      };
+      cachedInputsByTournament.set(sweepstakeTournamentCode, cachedInputs);
+    }
+
     const wasRecalculated = await recalculateSweepstakeScoresWithCachedInputs(
       supabase,
       {
         sweepstakeId: sweepstake.id,
         sourceUpdatedAt,
-        teamScores,
-        teamPerformances,
+        teamScores: cachedInputs.teamScores,
+        teamPerformances: cachedInputs.teamPerformances,
       },
     );
 
@@ -90,9 +103,12 @@ export async function recalculateSweepstakeScores(
   supabase: SupabaseClient,
   sweepstakeId: string,
   sourceUpdatedAt: string,
+  tournamentCode?: string,
 ) {
-  const teams = await loadCachedTeams(supabase);
-  const matches = await loadCachedMatches(supabase);
+  const sweepstakeTournamentCode =
+    tournamentCode ?? (await loadSweepstakeTournamentCode(supabase, sweepstakeId));
+  const teams = await loadCachedTeams(supabase, sweepstakeTournamentCode);
+  const matches = await loadCachedMatches(supabase, sweepstakeTournamentCode);
   const teamPerformances = buildTeamPerformances(teams, matches);
   const teamScores = calculateTeamScores(teamPerformances);
 
@@ -200,11 +216,11 @@ export function buildTeamPerformances(
   });
 }
 
-async function loadCachedTeams(supabase: SupabaseClient) {
+async function loadCachedTeams(supabase: SupabaseClient, tournamentCode: string) {
   const { data, error } = await supabase
     .from("teams")
     .select("id, name")
-    .eq("tournament_code", footballDataConfig.tournamentCode);
+    .eq("tournament_code", tournamentCode);
 
   if (error) {
     throw error;
@@ -213,17 +229,34 @@ async function loadCachedTeams(supabase: SupabaseClient) {
   return data ?? [];
 }
 
-async function loadCachedMatches(supabase: SupabaseClient) {
+async function loadCachedMatches(supabase: SupabaseClient, tournamentCode: string) {
   const { data, error } = await supabase
     .from("matches")
     .select("id, stage, status, home_team_id, away_team_id, home_score, away_score, kickoff_at")
-    .eq("tournament_code", footballDataConfig.tournamentCode);
+    .eq("tournament_code", tournamentCode);
 
   if (error) {
     throw error;
   }
 
   return data ?? [];
+}
+
+async function loadSweepstakeTournamentCode(
+  supabase: SupabaseClient,
+  sweepstakeId: string,
+) {
+  const { data, error } = await supabase
+    .from("sweepstakes")
+    .select("tournament_code")
+    .eq("id", sweepstakeId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data.tournament_code ?? footballDataConfig.tournamentCode;
 }
 
 async function loadParticipants(
@@ -278,14 +311,20 @@ async function loadBadgeCategories(
     throw error;
   }
 
-  return (data ?? [])
-    .filter((category) => badgeKeys.has(category.key as BadgeCategoryKey))
-    .map((category) => ({
+  return (data ?? []).flatMap((category) => {
+    const key = normalizeBadgeCategoryKey(category.key);
+
+    if (!key) {
+      return [];
+    }
+
+    return {
       id: category.id,
-      key: category.key as BadgeCategoryKey,
+      key,
       label: category.label,
       status: category.status.replace("_", "-") as BadgeCategoryInput["status"],
-    }));
+    };
+  });
 }
 
 function getReachedStage(teamId: string, matches: CachedMatch[]): TournamentStage {

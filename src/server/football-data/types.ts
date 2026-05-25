@@ -1,10 +1,11 @@
 import type { Json } from "@/server/supabase/database.types";
+import { defaultFootballDataTournament } from "@/features/tournaments/world-cup";
 
 export const footballDataConfig = {
   baseUrl: "https://api.football-data.org/v4",
-  competitionCode: "WC",
-  season: 2026,
-  tournamentCode: "WC_2026",
+  competitionCode: defaultFootballDataTournament.competitionCode,
+  season: defaultFootballDataTournament.season,
+  tournamentCode: defaultFootballDataTournament.code,
 } as const;
 
 export type FootballDataFetch = (
@@ -19,6 +20,9 @@ export type FootballDataTeam = {
   tla?: string | null;
   crest?: string | null;
   group?: string | null;
+  area?: {
+    flag?: string | null;
+  } | null;
 };
 
 export type FootballDataScoreValue = {
@@ -66,6 +70,7 @@ export type NormalizedTeamRow = {
   name: string;
   short_name: string | null;
   group_name: string | null;
+  flag_source_url: string | null;
 };
 
 export type NormalizedMatchRow = {

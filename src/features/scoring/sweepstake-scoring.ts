@@ -51,10 +51,16 @@ export type ParticipantScore = {
 
 export type BadgeCategoryInput = {
   id: string;
-  key: BadgeCategoryKey;
+  key: BadgeCategoryKey | LegacyPlacementBadgeCategoryKey;
   label: string;
   status?: "active" | "undecided" | "manual-future";
 };
+
+export type LegacyPlacementBadgeCategoryKey =
+  | "first"
+  | "second"
+  | "third"
+  | "fourth";
 
 export type BadgeCategoryKey =
   | "first-place"
@@ -171,7 +177,13 @@ export function calculateBadgeHolders(input: {
       return [];
     }
 
-    switch (category.key) {
+    const categoryKey = normalizeBadgeCategoryKey(category.key);
+
+    if (!categoryKey) {
+      return [];
+    }
+
+    switch (categoryKey) {
       case "first-place":
         return participantRankBadge(category.id, input.participantScores, 1);
       case "second-place":
@@ -222,6 +234,33 @@ export function calculateBadgeHolders(input: {
         return [];
     }
   });
+}
+
+export function normalizeBadgeCategoryKey(
+  key: string,
+): BadgeCategoryKey | null {
+  switch (key) {
+    case "first":
+      return "first-place";
+    case "second":
+      return "second-place";
+    case "third":
+      return "third-place";
+    case "fourth":
+      return "fourth-place";
+    case "first-place":
+    case "second-place":
+    case "third-place":
+    case "fourth-place":
+    case "wooden-spoon":
+    case "first-knocked-out":
+    case "most-goals-conceded":
+    case "fewest-goals-scored":
+    case "most-cards":
+      return key;
+    default:
+      return null;
+  }
 }
 
 function participantRankBadge(

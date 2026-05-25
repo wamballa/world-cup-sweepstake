@@ -6,6 +6,7 @@ import {
   type FootballDataMatchesResponse,
   type FootballDataTeamsResponse,
 } from "./types";
+import { getFootballDataTournamentByCode } from "@/features/tournaments/world-cup";
 
 export class FootballDataApiError extends Error {
   constructor(
@@ -27,10 +28,14 @@ export function createFootballDataClient(options?: {
   apiToken?: string;
   fetch?: FootballDataFetch;
   baseUrl?: string;
+  tournamentCode?: string;
 }): FootballDataClient {
   const apiToken = options?.apiToken ?? process.env.FOOTBALL_DATA_API_TOKEN;
   const fetchImpl = options?.fetch ?? fetch;
   const baseUrl = options?.baseUrl ?? footballDataConfig.baseUrl;
+  const tournament = getFootballDataTournamentByCode(
+    options?.tournamentCode ?? footballDataConfig.tournamentCode,
+  );
 
   if (!apiToken) {
     throw new Error("Missing required environment variable: FOOTBALL_DATA_API_TOKEN");
@@ -61,11 +66,11 @@ export function createFootballDataClient(options?: {
   return {
     getTeams: () =>
       request<FootballDataTeamsResponse>(
-        `/v4/competitions/${footballDataConfig.competitionCode}/teams?season=${footballDataConfig.season}`,
+        `/v4/competitions/${tournament.competitionCode}/teams?season=${tournament.season}`,
       ),
     getMatches: () =>
       request<FootballDataMatchesResponse>(
-        `/v4/competitions/${footballDataConfig.competitionCode}/matches?season=${footballDataConfig.season}`,
+        `/v4/competitions/${tournament.competitionCode}/matches?season=${tournament.season}`,
       ),
   };
 }

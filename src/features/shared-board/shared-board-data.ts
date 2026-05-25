@@ -1,4 +1,5 @@
 import type { Database } from "@/server/supabase/database.types";
+import { normalizeBadgeCategoryKey } from "@/features/scoring/sweepstake-scoring";
 
 export type SharedBoardParticipant = {
   id: string;
@@ -36,6 +37,7 @@ export type SharedBoardTeam = {
   goalsAgainst: number;
   allocatedTo: string | null;
   allocatedToName: string | null;
+  flagAssetPath: string | null;
 };
 
 export type SharedBoardMatch = {
@@ -83,6 +85,7 @@ export type SharedBoardData = {
   sweepstakeId: string;
   sweepstakeName: string;
   tournamentCode: string;
+  sharedViewMode: "participant_board" | "countdown";
   participants: SharedBoardParticipant[];
   standings: SharedBoardStanding[];
   teams: SharedBoardTeam[];
@@ -97,6 +100,7 @@ export type SharedBoardMapperInput = {
     id: string;
     name: string;
     tournament_code: string;
+    shared_view_mode?: "participant_board" | "countdown";
   };
   participants: Array<{
     id: string;
@@ -116,6 +120,7 @@ export type SharedBoardMapperInput = {
     name: string;
     short_name: string | null;
     group_name: string | null;
+    flag_asset_path?: string | null;
   }>;
   teamScores: Array<{
     team_id: string;
@@ -189,14 +194,12 @@ export function buildSharedBoardData(
   const teamPoints = new Map(
     input.teamScores.map((score) => [score.team_id, score.points]),
   );
-  const participantScoreRows = new Map(
-    input.participantScores.map((score) => [score.participant_id, score]),
+  const validAllocations = input.allocations.filter((allocation) =>
+    teamsById.has(allocation.team_id),
   );
-  const allocationsByParticipant = groupAllocationsByParticipant(
-    input.allocations,
-  );
+  const allocationsByParticipant = groupAllocationsByParticipant(validAllocations);
   const allocationByTeam = new Map(
-    input.allocations.map((allocation) => [
+    validAllocations.map((allocation) => [
       allocation.team_id,
       allocation.participant_id,
     ]),
@@ -208,16 +211,16 @@ export function buildSharedBoardData(
   const standings = rankStandings(
     participants.map((participant) => {
       const teamIds = allocationsByParticipant.get(participant.id) ?? [];
-      const persistedScore = participantScoreRows.get(participant.id);
       const points =
-        persistedScore?.points ??
-        teamIds.reduce((total, teamId) => total + (teamPoints.get(teamId) ?? 0), 0);
+        teamIds.length > 0
+          ? teamIds.reduce((total, teamId) => total + (teamPoints.get(teamId) ?? 0), 0)
+          : 0;
 
       return {
         participantId: participant.id,
         name: participant.name,
         points,
-        teamCount: persistedScore?.team_count ?? teamIds.length,
+        teamCount: teamIds.length,
         teamIds,
         teamNames: teamIds.map((teamId) => teamsById.get(teamId)?.name ?? "Unknown team"),
       };
@@ -241,6 +244,7 @@ export function buildSharedBoardData(
       allocatedToName:
         participants.find((participant) => participant.id === allocatedTo)?.name ??
         null,
+      flagAssetPath: team.flag_asset_path ?? null,
     };
   });
   const sharedMatches = input.matches
@@ -290,6 +294,7 @@ export function buildSharedBoardData(
     sweepstakeId: input.sweepstake.id,
     sweepstakeName: input.sweepstake.name,
     tournamentCode: input.sweepstake.tournament_code,
+    sharedViewMode: input.sweepstake.shared_view_mode ?? "participant_board",
     participants,
     standings,
     teams: sharedTeams,
@@ -297,18 +302,26 @@ export function buildSharedBoardData(
     badges: input.badgeCategories
       .filter((category) => category.is_enabled)
       .sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label))
-      .map((category) => ({
-        id: category.id,
-        label: category.label,
-        status: category.status.replace("_", "-") as SharedBoardBadge["status"],
-        holderParticipantIds: input.badgeHolders
+      .map((category) => {
+        const categoryKey = normalizeBadgeCategoryKey(category.key);
+        const persistedHolderParticipantIds = input.badgeHolders
           .filter((holder) => holder.badge_category_id === category.id)
           .map((holder) => holder.participant_id)
-          .filter((participantId): participantId is string => Boolean(participantId)),
-        supportLine:
-          badgeSupportLines[category.key] ??
-          "Calculated from cached sweepstake data.",
-      })),
+          .filter((participantId): participantId is string => Boolean(participantId));
+
+        return {
+          id: category.id,
+          label: category.label,
+          status: category.status.replace("_", "-") as SharedBoardBadge["status"],
+          holderParticipantIds:
+            persistedHolderParticipantIds.length > 0
+              ? persistedHolderParticipantIds
+              : derivePlacementBadgeHolders(categoryKey, standings),
+          supportLine:
+            badgeSupportLines[categoryKey ?? category.key] ??
+            "Calculated from cached sweepstake data.",
+        };
+      }),
     syncState: {
       lastSuccessfulSyncAt: input.syncState?.last_successful_sync_at ?? null,
       freshnessLabel: formatSyncFreshness(input.syncState?.last_successful_sync_at ?? null),
@@ -323,6 +336,30 @@ export function buildSharedBoardData(
       hasFinalMatches: sharedMatches.some((match) => match.status === "final"),
     },
   };
+}
+
+function derivePlacementBadgeHolders(
+  categoryKey: ReturnType<typeof normalizeBadgeCategoryKey>,
+  standings: SharedBoardStanding[],
+) {
+  const rankByBadgeKey = {
+    "first-place": 1,
+    "second-place": 2,
+    "third-place": 3,
+    "fourth-place": 4,
+  } as const;
+  const rank =
+    categoryKey && categoryKey in rankByBadgeKey
+      ? rankByBadgeKey[categoryKey as keyof typeof rankByBadgeKey]
+      : null;
+
+  if (rank == null) {
+    return [];
+  }
+
+  return standings
+    .filter((standing) => standing.teamCount > 0 && standing.rank === rank)
+    .map((standing) => standing.participantId);
 }
 
 function getParticipantNameForTeam(

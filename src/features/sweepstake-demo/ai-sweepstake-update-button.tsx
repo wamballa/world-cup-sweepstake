@@ -122,8 +122,7 @@ export function AiSweepstakeUpdateButton({
             Sweepstake pulse check
           </DialogTitle>
           <DialogDescription className="font-semibold text-campaign-muted">
-            Generated from cached sweepstake data. Football data cache:{" "}
-            {freshnessLabel}.
+            Cached sweepstake data. Football-data cache: {freshnessLabel}.
           </DialogDescription>
         </DialogHeader>
 
@@ -142,8 +141,7 @@ export function AiSweepstakeUpdateButton({
                 {response.text}
               </div>
               <p className="text-xs font-semibold text-campaign-muted">
-                {response.cached ? "Cached update" : "Freshly generated"} from
-                cached app data.
+                {response.cached ? "Cached update." : "Fresh update."}
               </p>
             </div>
           ) : (

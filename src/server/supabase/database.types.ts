@@ -9,7 +9,10 @@ export type Json =
 export type Database = {
   public: {
     Enums: {
-      allocation_audit_action: "initial_draw" | "rerun" | "manual_move";
+      allocation_audit_action:
+        | "initial_draw"
+        | "rerun"
+        | "manual_move";
       badge_status: "active" | "undecided" | "manual_future";
       match_status:
         | "scheduled"
@@ -18,6 +21,7 @@ export type Database = {
         | "final"
         | "postponed"
         | "cancelled";
+      shared_view_mode: "participant_board" | "countdown";
       sweepstake_status: "draft" | "shared" | "archived";
       sync_run_status: "started" | "succeeded" | "failed";
     };
@@ -215,6 +219,7 @@ export type Database = {
           name: string;
           tournament_code: string;
           status: Database["public"]["Enums"]["sweepstake_status"];
+          shared_view_mode: Database["public"]["Enums"]["shared_view_mode"];
           share_token: string;
           created_by: string;
           created_at: string;
@@ -225,6 +230,7 @@ export type Database = {
           name: string;
           tournament_code?: string;
           status?: Database["public"]["Enums"]["sweepstake_status"];
+          shared_view_mode?: Database["public"]["Enums"]["shared_view_mode"];
           share_token?: string;
           created_by: string;
           created_at?: string;
@@ -340,6 +346,8 @@ export type Database = {
           name: string;
           short_name: string | null;
           group_name: string | null;
+          flag_source_url: string | null;
+          flag_asset_path: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -350,6 +358,8 @@ export type Database = {
           name: string;
           short_name?: string | null;
           group_name?: string | null;
+          flag_source_url?: string | null;
+          flag_asset_path?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -405,6 +415,7 @@ export type Database = {
           name: string;
           tournament_code: string;
           status: Database["public"]["Enums"]["sweepstake_status"];
+          shared_view_mode: Database["public"]["Enums"]["shared_view_mode"];
           created_at: string;
           updated_at: string;
         }[];

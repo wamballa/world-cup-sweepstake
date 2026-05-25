@@ -5,6 +5,7 @@ import { createPreviewSharedBoardData } from "@/server/shared-board/preview-shar
 import {
   buildSweepstakeUpdatePromptPayload,
   createOpenAiResponse,
+  createSweepstakeUpdateInstructions,
   defaultSweepstakeUpdateModel,
   getOrCreateSweepstakeUpdate,
   hashSweepstakeUpdatePayload,
@@ -99,6 +100,52 @@ describe("sweepstake AI update prompt payload", () => {
     expect(firstHash).toBe(secondHash);
     expect(changedHash).not.toBe(firstHash);
   });
+
+  it("marks no-result tournament data as pre-tournament for safer commentary", () => {
+    const boardData = createBoardData();
+    const payload = buildSweepstakeUpdatePromptPayload({
+      ...boardData,
+      matches: boardData.matches.map((match) => ({
+        ...match,
+        status: "scheduled",
+        homeScore: null,
+        awayScore: null,
+      })),
+      teams: boardData.teams.map((team) => ({
+        ...team,
+        points: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+      })),
+      summary: {
+        ...boardData.summary,
+        finalMatchCount: 0,
+        totalGoals: 0,
+        hasFinalMatches: false,
+      },
+    });
+
+    expect(payload.competitionState).toBe("pre_tournament");
+    expect(payload.recentFinalMatches).toHaveLength(0);
+    expect(payload.badges.every((badge) => badge.holders.length === 0)).toBe(
+      true,
+    );
+  });
+});
+
+describe("sweepstake AI update instructions", () => {
+  it("requires compact grounded commentary without duplicate cache notes", () => {
+    const instructions = createSweepstakeUpdateInstructions();
+
+    expect(instructions).toContain("one short headline of 8 words or fewer");
+    expect(instructions).toContain("3 to 4 bullets");
+    expect(instructions).toContain("18 words or fewer");
+    expect(instructions).toContain("Do not add a separate cache note");
+    expect(instructions).toContain("Do not describe leaderboard movement");
+    expect(instructions).toContain("competitionState is pre_tournament");
+    expect(instructions).toContain("never pile on one participant");
+    expect(instructions).toContain("Use only the JSON payload supplied by the app");
+  });
 });
 
 describe("getOrCreateSweepstakeUpdate", () => {
@@ -145,6 +192,7 @@ describe("getOrCreateSweepstakeUpdate", () => {
     expect(openAiClient).toHaveBeenCalledWith(
       expect.objectContaining({
         apiKey: "test-key",
+        instructions: expect.stringContaining("3 to 4 bullets"),
         model: "test-model",
       }),
     );

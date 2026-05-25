@@ -79,6 +79,22 @@ describe("fair allocation", () => {
     expect(validateCompleteAllocation(people, teams, allocations)).toBe(true);
   });
 
+  it("allocates a historical 32-team World Cup season evenly", () => {
+    const historicalTeams = teams.slice(0, 32);
+    const people = participants(10);
+    const allocations = createFairAllocation(people, historicalTeams, fixedRandom);
+    const spread = getAllocationSpread(
+      people.map((participant) => participant.id),
+      allocations,
+    );
+
+    expect(allocations).toHaveLength(32);
+    expect(spread).toEqual({ min: 3, max: 4 });
+    expect(validateCompleteAllocation(people, historicalTeams, allocations)).toBe(
+      true,
+    );
+  });
+
   it("moves a team without unassigning or duplicating it", () => {
     const people = participants(4);
     const allocations = createFairAllocation(people, teams, fixedRandom);

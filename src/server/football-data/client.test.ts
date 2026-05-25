@@ -35,6 +35,28 @@ describe("football-data server client", () => {
     ]);
   });
 
+  it("uses the selected validation dataset for API requests", async () => {
+    const requested: string[] = [];
+    const client = createFootballDataClient({
+      apiToken: "test-token",
+      fetch: async (input) => {
+        requested.push(String(input));
+
+        return Response.json({ teams: [], matches: [] });
+      },
+      baseUrl: "https://example.test",
+      tournamentCode: "PL_2024",
+    });
+
+    await client.getTeams();
+    await client.getMatches();
+
+    expect(requested).toEqual([
+      "https://example.test/v4/competitions/PL/teams?season=2024",
+      "https://example.test/v4/competitions/PL/matches?season=2024",
+    ]);
+  });
+
   it("throws a typed error on failed API responses", async () => {
     const client = createFootballDataClient({
       apiToken: "test-token",
@@ -49,4 +71,5 @@ describe("football-data server client", () => {
       FootballDataApiError,
     );
   });
+
 });

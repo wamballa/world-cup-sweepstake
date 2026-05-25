@@ -207,7 +207,7 @@ function ParticipantIdentityCard({
             </Button>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <div className="grid gap-3 lg:grid-cols-[minmax(24rem,1fr)_auto] lg:items-end">
             <div className="space-y-2">
               <Label
                 htmlFor="participant-identity"
@@ -217,7 +217,7 @@ function ParticipantIdentityCard({
               </Label>
               <select
                 id="participant-identity"
-                className="h-11 w-full rounded-2xl border-2 border-campaign-ring bg-white px-3 text-sm font-semibold text-campaign-ink outline-none focus:border-campaign-purple"
+                className="h-11 w-full min-w-0 rounded-2xl border-2 border-campaign-ring bg-white px-3 text-sm font-semibold text-campaign-ink outline-none focus:border-campaign-purple"
                 value={draftParticipantId}
                 onChange={(event) =>
                   onDraftParticipantChange(event.target.value)

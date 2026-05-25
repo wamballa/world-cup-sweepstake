@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldSkipFootballDataSync } from "./sync";
+import { getCaughtErrorMessage, shouldSkipFootballDataSync } from "./sync";
 
 describe("football-data sync rate guard", () => {
   it("skips sync runs that start less than one minute after the previous run", () => {
@@ -19,5 +19,14 @@ describe("football-data sync rate guard", () => {
         new Date("2026-05-20T13:01:00.000Z"),
       ),
     ).toBe(false);
+  });
+
+  it("preserves plain Supabase error object messages", () => {
+    expect(
+      getCaughtErrorMessage({
+        code: "42P10",
+        message: "there is no unique or exclusion constraint matching",
+      }),
+    ).toBe("there is no unique or exclusion constraint matching");
   });
 });
