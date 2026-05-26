@@ -27,6 +27,7 @@ No active WIP items.
 
 ## Done
 
+- `BL-106` `[Done]` `[Bug]`: Fix the countdown page header metric so it shows total cached tournament matches instead of the number of allocated teams with first-match fixtures, avoiding misleading `48 fixtures` copy for the 104-match World Cup 2026 format.
 - `BL-102` `[Done]` `[Bug]`: Remove the explanatory sentence from the countdown hero panel: "Same shared link, pre-tournament mode. Allocations and first fixtures are grounded in cached sweepstake data." Keep the countdown page visually clean while preserving useful freshness/status labels elsewhere.
 - `BL-105` `[Done]`: Cache country flag assets for countdown country panels without browser calls to football-data.org, including team flag source URL storage, one-off server-side copying to a public Supabase Storage bucket, cached `flag_asset_path` exposure through shared-board data, and subtle flag backgrounds on countdown country blocks with readable overlays.
 - `BL-104` `[Done]` `[Bug]`: Remove the duplicated three-letter country-code lozenges from the top of each participant card on the countdown page, keeping the code only alongside the relevant country block to save space and reduce repetition.

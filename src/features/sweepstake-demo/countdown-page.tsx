@@ -38,17 +38,11 @@ export function CountdownPage({
     [boardData],
   );
   const countdownParts = useCountdownParts(countdownTarget);
-  const allocations = useMemo(
-    () => buildCountdownAllocations(boardData),
-    [boardData],
-  );
   const participantAllocations = useMemo(
     () => buildCountdownParticipantAllocations(boardData),
     [boardData],
   );
-  const datedFirstMatches = allocations.filter(
-    (allocation) => allocation.firstMatch?.kickoffAt,
-  ).length;
+  const cachedMatchCount = boardData.matches.length;
 
   return (
     <CampaignShell>
@@ -75,9 +69,9 @@ export function CountdownPage({
               />
               <CampaignMetric
                 className="px-3 py-2"
-                label="Fixtures"
+                label="Matches"
                 tone="yellow"
-                value={`${datedFirstMatches}`}
+                value={`${cachedMatchCount}`}
               />
             </div>
           }
