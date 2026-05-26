@@ -308,6 +308,7 @@ function useCountdownParts(target: string | null): CountdownPart[] {
 function formatTargetDate(target: string) {
   return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "full",
+    timeZone: "Europe/London",
     timeStyle: "short",
   }).format(new Date(target));
 }
