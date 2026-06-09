@@ -6,7 +6,7 @@ Admins create a friendly office sweepstake, add participants, and randomly alloc
 
 ## Current Status
 
-Backlog Phase 1, scaffold and design foundation, is complete. The workspace contains a Next.js App Router application with TypeScript, Tailwind CSS v4, shadcn/ui primitives, Motion, Vitest, and Playwright.
+The working application includes Supabase-backed persistence and admin authentication, fair team allocation, deterministic scoring, shared participant boards, server-side football-data.org synchronization, cached AI sweepstake updates, automated testing, and Vercel deployment.
 
 ## Key Rule
 
@@ -54,14 +54,27 @@ Required Vercel environment variables for the deployed app and football-data syn
 - `FOOTBALL_DATA_SYNC_SECRET`
 - `CRON_SECRET`
 
-Future AI and email work will also require:
+AI sweepstake updates require:
 
 - `OPENAI_API_KEY`
+- `OPENAI_SWEEPSTAKE_MODEL`
+
+Future email delivery will require:
+
 - `EMAIL_PROVIDER_API_KEY`
 - `EMAIL_FROM`
 
 The cron route accepts `GET` or `POST` and requires `Authorization: Bearer $CRON_SECRET`. For local/manual checks, it falls back to `FOOTBALL_DATA_SYNC_SECRET` when `CRON_SECRET` is not configured.
 
-## Preferred Stack
+## Tech Stack & Toolchain
 
-Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Motion, Supabase, football-data.org, OpenAI API, Vitest, and Playwright.
+- **Application:** Next.js 16 App Router, React 19, and TypeScript
+- **UI and styling:** Tailwind CSS v4, shadcn/ui, Radix UI, Lucide icons, and Motion
+- **Database and authentication:** Supabase Postgres, Supabase Auth, server-side clients, and Row Level Security
+- **Football data:** football-data.org API v4, accessed through server-only synchronization and cached in Supabase
+- **AI:** OpenAI API for grounded sweepstake updates generated from cached application data
+- **Hosting and automation:** Vercel with Vercel Cron for scheduled football-data synchronization
+- **Testing:** Vitest, Testing Library, jsdom, and Playwright
+- **Code quality:** ESLint with the Next.js configuration
+- **Package management:** npm with `package-lock.json`
+- **Source control:** Git and GitHub
