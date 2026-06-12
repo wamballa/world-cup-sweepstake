@@ -62,6 +62,10 @@ Initial cadence:
 
 Keep the cadence within the free-tier 10 calls/minute limit and tune it during implementation.
 
+Production currently uses one central sync every 30 minutes during the
+tournament. Each run makes two football-data.org requests, for teams and
+matches, then recalculates sweepstakes from the cached results.
+
 ## Delayed Scores
 
 Design first for delayed scores on the free tier. Show freshness labels such as delayed, last updated, final, or update pending. Do not imply live data unless the data source supports it.

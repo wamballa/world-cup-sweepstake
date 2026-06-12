@@ -1,5 +1,11 @@
 # Decision Log
 
+## 2026-06-12: BL-108 Tournament Matchday Polling
+
+Decision: After upgrading the Vercel team to Pro, change the central World Cup football-data sync from one imprecise daily invocation to every 30 minutes using `*/30 * * * *`. Keep the existing authenticated route, one-minute overlap guard, server-only football-data.org client, Supabase cache, sync audit rows, and deterministic score recalculation unchanged.
+
+Reason: Thirty-minute polling keeps an office sweepstake reasonably current while using only two football-data.org requests per run, safely below the free-tier limit of 10 requests per minute. Limiting the live change to scheduling avoids unnecessary risk to allocations, scoring, persistence, and participant UI.
+
 ## 2026-06-12: BL-109 Completed Match Terminology
 
 Decision: Keep `final` as the internal persisted status for matches returned by football-data.org as `FINISHED`, but display `Completed` on participant-facing match status badges, summary metrics, stats copy, and AI commentary. Reserve `Final` for the actual tournament stage.
