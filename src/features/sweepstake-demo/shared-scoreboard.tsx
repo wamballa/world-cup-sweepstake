@@ -30,7 +30,11 @@ import {
   type SharedBoardStanding,
 } from "@/features/shared-board/shared-board-data";
 
-import { formatStatus, StatusBadge } from "./demo-primitives";
+import {
+  formatMatchStatus,
+  formatStatus,
+  StatusBadge,
+} from "./demo-primitives";
 
 const sharedBoardTabTriggerClassName =
   "h-8 rounded-xl px-1 py-0 font-black leading-none !text-campaign-purple/65 hover:!text-campaign-purple data-active:!bg-transparent data-active:!text-campaign-purple-strong data-active:!shadow-none data-[state=active]:!bg-transparent data-[state=active]:!text-campaign-purple-strong data-[state=active]:!shadow-none [&_span]:text-inherit [&_span]:leading-none [&_svg]:text-current";
@@ -188,7 +192,7 @@ function HeroSummaryMetrics({
         value={leadingParticipant?.name ?? boardData.summary.leaderName ?? "-"}
       />
       <HeroSummaryMetric
-        label="Finished"
+        label="Completed"
         value={`${boardData.summary.finalMatchCount}`}
       />
       <HeroSummaryMetric
@@ -637,7 +641,7 @@ function MatchesPanel({ matches }: { matches: SharedBoardMatch[] }) {
                 <Badge
                   variant={match.status === "delayed" ? "outline" : "secondary"}
                 >
-                  {formatStatus(match.status)}
+                  {formatMatchStatus(match.status)}
                 </Badge>
               </TableCell>
               <TableCell className="text-right font-mono font-semibold">
@@ -689,15 +693,15 @@ function StatsPanel({
       />
       <StatTile
         icon={<CalendarDays className="size-4" aria-hidden="true" />}
-        label="Finished"
+        label="Completed"
         value={`${finalMatches}`}
-        body="Matches with final cached scores."
+        body="Matches with completed cached results."
       />
       <StatTile
         icon={<RefreshCw className="size-4" aria-hidden="true" />}
         label="Pending"
         value={`${scheduledMatches + delayedMatches}`}
-        body="Scheduled or delayed fixtures still awaiting final cached scores."
+        body="Scheduled or delayed fixtures still awaiting completed results."
       />
     </div>
   );

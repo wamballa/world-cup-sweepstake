@@ -69,7 +69,11 @@ describe("sweepstake AI update prompt payload", () => {
       rank: 1,
     });
     expect(payload.standings[0].name).toEqual(expect.any(String));
-    expect(payload.recentFinalMatches.length).toBeGreaterThan(0);
+    expect(payload.promptVersion).toBe(
+      "2026-06-12-completed-match-language-v5",
+    );
+    expect(payload.recentCompletedMatches.length).toBeGreaterThan(0);
+    expect(payload).not.toHaveProperty("recentFinalMatches");
     expect(payload.upcomingOrDelayedMatches.length).toBeGreaterThan(0);
     expect(serializedPayload).not.toContain("emailUpdatesEnabled");
     expect(serializedPayload).not.toContain("OPENAI");
@@ -126,7 +130,7 @@ describe("sweepstake AI update prompt payload", () => {
     });
 
     expect(payload.competitionState).toBe("pre_tournament");
-    expect(payload.recentFinalMatches).toHaveLength(0);
+    expect(payload.recentCompletedMatches).toHaveLength(0);
     expect(payload.badges.every((badge) => badge.holders.length === 0)).toBe(
       true,
     );
@@ -145,6 +149,8 @@ describe("sweepstake AI update instructions", () => {
     expect(instructions).toContain("competitionState is pre_tournament");
     expect(instructions).toContain("never pile on one participant");
     expect(instructions).toContain("Use only the JSON payload supplied by the app");
+    expect(instructions).toContain("Never call them finals");
+    expect(instructions).toContain("use Final only");
   });
 });
 

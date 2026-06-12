@@ -89,3 +89,7 @@ export function formatStatus(status: string) {
     .map((part) => part[0]?.toUpperCase() + part.slice(1))
     .join(" ");
 }
+
+export function formatMatchStatus(status: string) {
+  return status === "final" ? "Completed" : formatStatus(status);
+}

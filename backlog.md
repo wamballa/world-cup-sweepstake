@@ -28,6 +28,7 @@ No active WIP items.
 
 ## Done
 
+- `BL-109` `[Done]` `[Bug]`: Replace participant-facing use of `Final` as a completed-match status with `Completed`, while retaining the internal `final` match status for persistence and scoring, preserving `Final` for the actual tournament stage, updating summary and stats copy, and preventing AI sweepstake updates from describing ordinary completed matches as "finals".
 - `BL-107` `[Done]` `[Bug]`: Make the countdown hero kickoff date formatting deterministic across Vercel server rendering and browser hydration by using the intended tournament display timezone, preventing production-only React text mismatch warnings.
 - `BL-106` `[Done]` `[Bug]`: Fix the countdown page header metric so it shows total cached tournament matches instead of the number of allocated teams with first-match fixtures, avoiding misleading `48 fixtures` copy for the 104-match World Cup 2026 format.
 - `BL-102` `[Done]` `[Bug]`: Remove the explanatory sentence from the countdown hero panel: "Same shared link, pre-tournament mode. Allocations and first fixtures are grounded in cached sweepstake data." Keep the countdown page visually clean while preserving useful freshness/status labels elsewhere.

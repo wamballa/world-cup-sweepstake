@@ -296,10 +296,22 @@ test("participant board is separated from admin controls and supports saved iden
   await page.getByRole("tab", { name: "Matches" }).click();
   await expect(page.getByRole("columnheader", { name: "Participants" })).toBeVisible();
   await expect(
+    page
+      .getByRole("row")
+      .filter({ hasText: "Aurora Republic v Bayside Union" })
+      .getByText("Completed", { exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByLabel("Friday Office Draw").getByText("Delayed").first(),
   ).toBeVisible();
 
   await page.getByRole("tab", { name: "Stats" }).click();
-  await expect(page.getByText("Matches with final cached scores.")).toBeVisible();
-  await expect(page.getByText("Scheduled or delayed fixtures still awaiting final cached scores.")).toBeVisible();
+  await expect(
+    page.getByText("Matches with completed cached results."),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Scheduled or delayed fixtures still awaiting completed results.",
+    ),
+  ).toBeVisible();
 });

@@ -184,7 +184,7 @@ function CampaignHero({
         </div>
         <div className="grid gap-2">
           <CampaignMetric label="Current leader" value={leader?.name ?? "TBC"} />
-          <CampaignMetric label="Finished matches" value={`${finalMatches}`} />
+          <CampaignMetric label="Completed matches" value={`${finalMatches}`} />
           <CampaignMetric label="Teams still tracked" value={`${activeTeams}`} />
           <CampaignMetric label="Delayed results" value={`${delayedMatches}`} />
         </div>

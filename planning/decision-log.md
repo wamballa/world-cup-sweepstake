@@ -1,5 +1,11 @@
 # Decision Log
 
+## 2026-06-12: BL-109 Completed Match Terminology
+
+Decision: Keep `final` as the internal persisted status for matches returned by football-data.org as `FINISHED`, but display `Completed` on participant-facing match status badges, summary metrics, stats copy, and AI commentary. Reserve `Final` for the actual tournament stage.
+
+Reason: Using `Final` for every completed match is ambiguous in a knockout tournament and can be mistaken for the World Cup Final. Keeping the internal value avoids a live database migration and scoring risk while a match-specific presentation label provides clearer language.
+
 ## 2026-05-24: Shared Link Countdown Mode
 
 Decision: Add a sweepstake-level `shared_view_mode` so the existing `/s/[shareToken]` URL can switch between the current participant board and a new countdown page after a draw exists. The countdown page uses the same cached shared-board data contract, derives the tournament countdown from the earliest cached kickoff where available, falls back to the configured World Cup 2026 start date only when needed, and shows allocations with each team's first cached match, opponent team, and participant matchup.

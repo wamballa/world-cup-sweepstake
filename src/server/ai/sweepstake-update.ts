@@ -149,7 +149,7 @@ export async function getOrCreateSweepstakeUpdate(
 export function buildSweepstakeUpdatePromptPayload(boardData: SharedBoardData) {
   const competitionState = getSweepstakeUpdateCompetitionState(boardData);
   const hasResultBackedBadges = competitionState !== "pre_tournament";
-  const recentFinalMatches = boardData.matches
+  const recentCompletedMatches = boardData.matches
     .filter((match) => match.status === "final")
     .slice(-5)
     .map((match) => ({
@@ -177,7 +177,7 @@ export function buildSweepstakeUpdatePromptPayload(boardData: SharedBoardData) {
 
   return {
     feature: sweepstakeUpdateFeatureKey,
-    promptVersion: "2026-05-24-pre-tournament-v4",
+    promptVersion: "2026-06-12-completed-match-language-v5",
     sweepstake: {
       id: boardData.sweepstakeId,
       name: boardData.sweepstakeName,
@@ -218,7 +218,7 @@ export function buildSweepstakeUpdatePromptPayload(boardData: SharedBoardData) {
         : [],
       supportLine: badge.supportLine,
     })),
-    recentFinalMatches,
+    recentCompletedMatches,
     upcomingOrDelayedMatches,
     scoringRules:
       "Group win 3, group draw 1, reach Round of 16 5, reach Quarter-final 8, reach Semi-final 12, runner-up 15, World Cup winner 25.",
@@ -254,10 +254,11 @@ export function createSweepstakeUpdateInstructions() {
     "When competitionState is pre_tournament, do not name badge holders, top spot holders, podium chasers, winners, losers, or leaderboard drama.",
     "When competitionState is pre_tournament, say the tournament has not started from the cached results, everyone is on zero, and mention upcoming fixtures if supplied.",
     "Do not make gambling-style advice or predictions. Avoid certainty about future outcomes.",
-    "If cached data is missing, delayed, awaiting first sync, or not final, say that plainly and briefly.",
+    "If cached data is missing, delayed, awaiting first sync, or not completed, say that plainly and briefly.",
     "Refer to freshness only as the football-data cache timestamp from the payload, not the current time or generation time.",
     "Keep the tone punchy, warm, and lightly playful. Banter must stay kind, office-safe, and never pile on one participant.",
-    "Prioritize what matters now: leader gap, podium chase, badge race, recent final results, or team points. Skip low-signal facts.",
+    "Prioritize what matters now: leader gap, podium chase, badge race, recent completed results, or team points. Skip low-signal facts.",
+    "Call concluded matches completed matches or completed results. Never call them finals; use Final only when the payload stage is the tournament Final.",
     "Return plain text only in this exact shape: one short headline of 8 words or fewer, then 3 to 4 bullets. Each bullet must be 18 words or fewer.",
     "Do not add a separate cache note, sign-off, intro, or markdown heading. The app displays freshness beside the update.",
   ].join(" ");
