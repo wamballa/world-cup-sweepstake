@@ -11,7 +11,7 @@ type VercelConfig = {
 };
 
 describe("football-data cron configuration", () => {
-  it("runs the protected central sync every 30 minutes", () => {
+  it("runs the protected central match sync every 5 minutes", () => {
     const config = JSON.parse(
       readFileSync(join(process.cwd(), "vercel.json"), "utf8"),
     ) as VercelConfig;
@@ -19,7 +19,7 @@ describe("football-data cron configuration", () => {
     expect(config.crons).toEqual([
       {
         path: "/api/cron/football-data-sync",
-        schedule: "*/30 * * * *",
+        schedule: "*/5 * * * *",
       },
     ]);
   });

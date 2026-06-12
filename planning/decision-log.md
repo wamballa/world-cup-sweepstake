@@ -1,5 +1,11 @@
 # Decision Log
 
+## 2026-06-12: BL-111 Five-Minute Match Sync And Diagnostics
+
+Decision: Run the protected production cron every five minutes. Scheduled runs always fetch matches, while teams and flag assets refresh when the last successful full sync is at least 30 minutes old. Manual and historical-dataset syncs remain full refreshes. Persist the trigger, sync mode, configured cadence, API request count, upstream status summary, latest upstream update time, and match status/score transitions in the existing sync-run metadata. Refresh visible participant boards every 60 seconds and expose sanitized sync health and recent runs only to authenticated admins.
+
+Reason: The Canada result was published by football-data.org three minutes after the 22:00 BST poll, leaving the cache marked live until the next 30-minute run. Five-minute match polling reduces that avoidable gap while using at most two provider calls in a minute, below the free-plan limit of 10 calls per minute. Explicit run metadata and an admin diagnostics panel make provider delay, missed schedules, failures, and cache transitions directly traceable without exposing credentials or raw payloads.
+
 ## 2026-06-12: BL-108 Tournament Matchday Polling
 
 Decision: After upgrading the Vercel team to Pro, change the central World Cup football-data sync from one imprecise daily invocation to every 30 minutes using `*/30 * * * *`. Keep the existing authenticated route, one-minute overlap guard, server-only football-data.org client, Supabase cache, sync audit rows, and deterministic score recalculation unchanged.

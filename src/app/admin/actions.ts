@@ -946,6 +946,8 @@ async function ensureTournamentCache(tournamentCode: string) {
     const result = await runFootballDataSync({
       supabase: getSupabaseServiceRoleClient(),
       tournamentCode,
+      trigger: "manual",
+      forceFullSync: true,
     });
 
     if (result.status === "failed") {

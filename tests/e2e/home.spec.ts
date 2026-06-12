@@ -4,6 +4,17 @@ const shareToken = "preview-v7m4q2x9c8p6n3r5t1w0y4k7";
 const e2eAdminEmail = process.env.E2E_ADMIN_EMAIL;
 const e2eAdminPassword = process.env.E2E_ADMIN_PASSWORD;
 
+test("football-data diagnostics require admin authentication", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin|\/login\?next=\/admin/);
+  await expect(
+    page.getByRole("heading", { name: "Football data diagnostics" }),
+  ).not.toBeVisible();
+});
+
 test("admin can use dashboard, setup flow, sweepstake tabs, and draw teams", async ({ page }) => {
   test.skip(
     !e2eAdminEmail || !e2eAdminPassword,
@@ -33,6 +44,10 @@ test("admin can use dashboard, setup flow, sweepstake tabs, and draw teams", asy
   await expect(page.getByRole("tab", { name: "Participants" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Draw" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Settings" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Football data diagnostics" }),
+  ).toBeVisible();
+  await expect(page.getByText("Every 5 minutes")).toBeVisible();
 
   await page
     .getByLabel("Bulk participant names")

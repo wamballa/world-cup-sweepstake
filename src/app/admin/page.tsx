@@ -3,7 +3,11 @@ import { headers } from "next/headers";
 
 import { AppShell, type AccountSweepstake } from "@/components/app-shell";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getFootballDataTournamentByCode } from "@/features/tournaments/world-cup";
+import {
+  footballDataTournaments,
+  getFootballDataTournamentByCode,
+} from "@/features/tournaments/world-cup";
+import { loadSyncDiagnostics } from "@/server/football-data/diagnostics";
 
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient();
@@ -16,6 +20,9 @@ export default async function AdminPage() {
   }
 
   const sweepstakes = await loadAdminSweepstakes(user.id);
+  const syncDiagnostics = await loadSyncDiagnostics(
+    footballDataTournaments.map((tournament) => tournament.code),
+  );
 
   return (
     <AppShell
@@ -25,6 +32,7 @@ export default async function AdminPage() {
       }}
       initialSweepstakes={sweepstakes}
       shareOrigin={await getShareOrigin()}
+      syncDiagnostics={syncDiagnostics}
     />
   );
 }

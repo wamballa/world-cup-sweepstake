@@ -56,15 +56,16 @@ Initial cadence:
 
 - Fixtures and schedule: daily.
 - Matches within 48 hours: every 2 to 4 hours.
-- Matchday active window: every 15 to 30 minutes if plan allows.
+- Matchday active window: every 5 minutes for matches if plan allows.
 - Completed matches: re-check after final, then once the next day for corrections.
 - Tables and team stats: after completed-match syncs.
 
 Keep the cadence within the free-tier 10 calls/minute limit and tune it during implementation.
 
-Production currently uses one central sync every 30 minutes during the
-tournament. Each run makes two football-data.org requests, for teams and
-matches, then recalculates sweepstakes from the cached results.
+Production runs one central sync every five minutes during the tournament.
+Every run fetches matches and recalculates sweepstakes from cached results.
+Teams and missing flag assets refresh at least every 30 minutes. Normal
+match-only runs make one football-data.org request; full runs make two.
 
 ## Delayed Scores
 

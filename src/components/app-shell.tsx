@@ -76,6 +76,10 @@ import {
   parseBulkParticipantNames,
 } from "@/features/participants/bulk-participant-parser";
 import { footballDataTournaments } from "@/features/tournaments/world-cup";
+import { SyncDiagnosticsPanel } from "@/features/admin/sync-diagnostics-panel";
+import type {
+  SyncDiagnostics,
+} from "@/features/admin/sync-diagnostics-types";
 import { AllocationSection } from "@/features/sweepstake-demo/allocation-section";
 import {
   createPreviewShareToken,
@@ -133,10 +137,12 @@ export function AppShell({
   admin,
   initialSweepstakes,
   shareOrigin,
+  syncDiagnostics,
 }: {
   admin: AdminIdentity;
   initialSweepstakes: AccountSweepstake[];
   shareOrigin: string;
+  syncDiagnostics: Record<string, SyncDiagnostics>;
 }) {
   const [screen, setScreen] = useState<AdminScreen>("dashboard");
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -745,6 +751,11 @@ export function AppShell({
                 spread={spread}
                 sweepstakeName={sweepstakeName}
                 tournamentCode={activeSweepstake?.tournamentCode ?? "WC_2026"}
+                syncDiagnostics={
+                  syncDiagnostics[
+                    activeSweepstake?.tournamentCode ?? "WC_2026"
+                  ] ?? null
+                }
                 teams={teams}
                 onActiveTabChange={setActiveTab}
                 onAddParticipant={addParticipant}
@@ -1095,6 +1106,7 @@ function SweepstakeAdminTabs({
   spread,
   sweepstakeName,
   tournamentCode,
+  syncDiagnostics,
   teams,
   onActiveTabChange,
   onAddParticipant,
@@ -1139,6 +1151,7 @@ function SweepstakeAdminTabs({
   spread: { min: number; max: number };
   sweepstakeName: string;
   tournamentCode: string;
+  syncDiagnostics: SyncDiagnostics | null;
   teams: DrawTeam[];
   onActiveTabChange: (value: AdminTab) => void;
   onAddParticipant: () => void;
@@ -1220,6 +1233,7 @@ function SweepstakeAdminTabs({
             sharedViewMode={sharedViewMode}
             spreadLabel={`${spread.min}-${spread.max}`}
             teamCount={teams.length}
+            syncDiagnostics={syncDiagnostics}
             onCopyShareLink={onCopyShareLink}
             onSharedViewModeChange={onSharedViewModeChange}
           />
@@ -1294,6 +1308,7 @@ function OverviewTab({
   sharedViewMode,
   spreadLabel,
   teamCount,
+  syncDiagnostics,
   onCopyShareLink,
   onSharedViewModeChange,
 }: {
@@ -1306,6 +1321,7 @@ function OverviewTab({
   sharedViewMode: SharedViewMode;
   spreadLabel: string;
   teamCount: number;
+  syncDiagnostics: SyncDiagnostics | null;
   onCopyShareLink: () => void;
   onSharedViewModeChange: (mode: SharedViewMode) => void;
 }) {
@@ -1342,6 +1358,8 @@ function OverviewTab({
           <StatusRow label="Audit events" value={`${auditEventCount}`} tone="info" />
         </CardContent>
       </Card>
+
+      <SyncDiagnosticsPanel diagnostics={syncDiagnostics} />
 
       <Card className="lg:col-span-2">
         <CardHeader>

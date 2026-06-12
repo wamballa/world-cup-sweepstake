@@ -78,6 +78,9 @@ export function SharedScoreboard({
             <p className="mt-3 max-w-2xl text-sm font-semibold text-white/90 sm:text-base">
               Cached tournament data. {boardData.syncState.freshnessLabel}.
             </p>
+            <p className="mt-1 max-w-2xl text-xs font-semibold text-white/80 sm:text-sm">
+              {boardData.syncState.freshnessNotice}
+            </p>
           </div>
           <HeroSummaryMetrics
             boardData={boardData}

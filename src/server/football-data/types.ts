@@ -33,6 +33,7 @@ export type FootballDataScoreValue = {
 export type FootballDataMatch = {
   id: number;
   utcDate: string;
+  lastUpdated?: string;
   status: string;
   stage: string;
   group?: string | null;

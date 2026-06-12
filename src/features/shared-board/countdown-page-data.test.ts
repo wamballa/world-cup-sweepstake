@@ -104,6 +104,8 @@ const boardData: SharedBoardData = {
   syncState: {
     lastSuccessfulSyncAt: null,
     freshnessLabel: "Awaiting first sync",
+    freshnessStatus: "awaiting",
+    freshnessNotice: "Awaiting the first football-data.org check.",
   },
   summary: {
     leaderName: "Maya",

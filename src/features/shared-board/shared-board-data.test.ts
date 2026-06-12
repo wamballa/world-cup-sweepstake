@@ -118,7 +118,7 @@ describe("shared board data mapper", () => {
     );
 
     expect(board.syncState.freshnessLabel).toBe(
-      "Updated 12 Jun 2026, 22:01 BST",
+      "Checked 12 Jun 2026, 22:01 BST",
     );
   });
 
@@ -133,7 +133,31 @@ describe("shared board data mapper", () => {
     );
 
     expect(board.syncState.freshnessLabel).toBe(
-      "Updated 12 Jan 2026, 21:01 GMT",
+      "Checked 12 Jan 2026, 21:01 GMT",
+    );
+  });
+
+  it("classifies current, delayed, and stale sync checks without changing matches", () => {
+    const checkedAt = "2026-06-12T21:00:00.000Z";
+    const buildAt = (now: string) =>
+      buildSharedBoardData(
+        boardInput({
+          now: new Date(now),
+          syncState: {
+            last_successful_sync_at: checkedAt,
+            updated_at: checkedAt,
+          },
+        }),
+      ).syncState;
+
+    expect(buildAt("2026-06-12T21:10:00.000Z").freshnessStatus).toBe(
+      "current",
+    );
+    expect(buildAt("2026-06-12T21:10:01.000Z").freshnessStatus).toBe(
+      "delayed",
+    );
+    expect(buildAt("2026-06-12T21:20:01.000Z").freshnessStatus).toBe(
+      "stale",
     );
   });
 

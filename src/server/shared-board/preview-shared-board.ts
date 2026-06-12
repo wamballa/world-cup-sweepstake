@@ -90,6 +90,8 @@ export function createPreviewSharedBoardData(): SharedBoardData {
     syncState: {
       lastSuccessfulSyncAt: null,
       freshnessLabel: "Preview data",
+      freshnessStatus: "current",
+      freshnessNotice: "Preview data does not use live football results.",
     },
     summary: {
       leaderName: standings[0]?.name ?? null,

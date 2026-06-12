@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const result = await runFootballDataSync();
+  const result = await runFootballDataSync({ trigger: "scheduled" });
   const status = result.status === "failed" ? 502 : 200;
 
   return NextResponse.json(result, { status });

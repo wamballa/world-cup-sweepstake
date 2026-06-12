@@ -17,6 +17,13 @@ export type FootballDataCacheInput = {
   teamStats: NormalizedTeamMatchStat[];
 };
 
+export type CachedMatchSnapshot = {
+  external_id: string;
+  status: string;
+  home_score: number | null;
+  away_score: number | null;
+};
+
 type TeamLookup = Map<string, string>;
 type MatchLookup = Map<string, string>;
 
@@ -96,6 +103,39 @@ export async function cacheFootballData(
     matchCount: matchInserts.length,
     statCount: statInserts.length,
   };
+}
+
+export async function loadCachedMatchSnapshots(
+  supabase: SupabaseClient,
+  tournamentCode: string,
+  externalIds: string[],
+): Promise<CachedMatchSnapshot[]> {
+  if (externalIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("matches")
+    .select("external_id, status, home_score, away_score")
+    .eq("tournament_code", tournamentCode)
+    .in("external_id", externalIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).flatMap((match) =>
+    match.external_id
+      ? [
+          {
+            external_id: match.external_id,
+            status: match.status,
+            home_score: match.home_score,
+            away_score: match.away_score,
+          },
+        ]
+      : [],
+  );
 }
 
 export function buildMatchInserts(

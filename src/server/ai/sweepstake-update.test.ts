@@ -18,7 +18,9 @@ function createBoardData() {
     sweepstakeId: "sweepstake-1",
     syncState: {
       lastSuccessfulSyncAt: "2026-06-15T08:00:00.000Z",
-      freshnessLabel: "Updated 15 Jun 2026, 09:00",
+      freshnessLabel: "Checked 15 Jun 2026, 09:00",
+      freshnessStatus: "current" as const,
+      freshnessNotice: "Scores may be delayed by the data provider.",
     },
   };
 }
@@ -64,7 +66,7 @@ describe("sweepstake AI update prompt payload", () => {
     const payload = buildSweepstakeUpdatePromptPayload(createBoardData());
     const serializedPayload = JSON.stringify(payload);
 
-    expect(payload.freshness).toBe("Updated 15 Jun 2026, 09:00");
+    expect(payload.freshness).toBe("Checked 15 Jun 2026, 09:00");
     expect(payload.standings[0]).toMatchObject({
       rank: 1,
     });

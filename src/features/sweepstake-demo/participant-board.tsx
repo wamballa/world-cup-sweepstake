@@ -1,8 +1,9 @@
 "use client";
 
 import { Bell, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   CampaignHeader,
@@ -16,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type { SharedBoardData } from "@/features/shared-board/shared-board-data";
+import { useVisibleBoardRefresh } from "@/features/shared-board/use-visible-board-refresh";
 
 import { AiSweepstakeUpdateButton } from "./ai-sweepstake-update-button";
 import { SharedScoreboard } from "./shared-scoreboard";
@@ -27,6 +29,7 @@ export function ParticipantBoard({
   shareToken: string;
   boardData: SharedBoardData;
 }) {
+  const router = useRouter();
   const standings = useMemo(() => boardData.standings, [boardData]);
   const leadingParticipant = standings[0];
   const storageKey = `world-cup-sweepstake:selected-participant:${shareToken}`;
@@ -35,6 +38,8 @@ export function ParticipantBoard({
   >(null);
   const [draftParticipantId, setDraftParticipantId] = useState("");
   const [isChoosing, setIsChoosing] = useState(true);
+  const refreshBoard = useCallback(() => router.refresh(), [router]);
+  useVisibleBoardRefresh(refreshBoard);
 
   useEffect(() => {
     const savedParticipantId = getSavedParticipantId(shareToken);

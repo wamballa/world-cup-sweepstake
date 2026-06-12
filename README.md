@@ -43,7 +43,7 @@ npm run test:e2e
 
 ## Deployment
 
-The app is configured for Vercel hosting. The production deployment uses Vercel Cron to call `/api/cron/football-data-sync` every 30 minutes, declared in `/vercel.json`.
+The app is configured for Vercel hosting. The production deployment uses Vercel Cron to call `/api/cron/football-data-sync` every 5 minutes, declared in `/vercel.json`.
 
 Required Vercel environment variables for the deployed app and football-data sync:
 

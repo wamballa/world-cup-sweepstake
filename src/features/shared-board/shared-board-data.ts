@@ -69,6 +69,8 @@ export type SharedBoardBadge = {
 export type SharedBoardSyncState = {
   lastSuccessfulSyncAt: string | null;
   freshnessLabel: string;
+  freshnessStatus: "awaiting" | "current" | "delayed" | "stale";
+  freshnessNotice: string;
 };
 
 export type SharedBoardSummary = {
@@ -96,6 +98,7 @@ export type SharedBoardData = {
 };
 
 export type SharedBoardMapperInput = {
+  now?: Date;
   sweepstake: {
     id: string;
     name: string;
@@ -325,6 +328,10 @@ export function buildSharedBoardData(
     syncState: {
       lastSuccessfulSyncAt: input.syncState?.last_successful_sync_at ?? null,
       freshnessLabel: formatSyncFreshness(input.syncState?.last_successful_sync_at ?? null),
+      ...classifySyncFreshness(
+        input.syncState?.last_successful_sync_at ?? null,
+        input.now ?? new Date(),
+      ),
     },
     summary: {
       leaderName: standings[0]?.name ?? null,
@@ -577,7 +584,7 @@ function formatSyncFreshness(lastSuccessfulSyncAt: string | null) {
     return "Awaiting first sync";
   }
 
-  return `Updated ${new Intl.DateTimeFormat("en-GB", {
+  return `Checked ${new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -587,6 +594,42 @@ function formatSyncFreshness(lastSuccessfulSyncAt: string | null) {
     timeZone: "Europe/London",
     timeZoneName: "short",
   }).format(new Date(lastSuccessfulSyncAt))}`;
+}
+
+export function classifySyncFreshness(
+  lastSuccessfulSyncAt: string | null,
+  now: Date,
+): Pick<SharedBoardSyncState, "freshnessStatus" | "freshnessNotice"> {
+  if (!lastSuccessfulSyncAt) {
+    return {
+      freshnessStatus: "awaiting",
+      freshnessNotice: "Awaiting the first football-data.org check.",
+    };
+  }
+
+  const checkedAt = new Date(lastSuccessfulSyncAt).getTime();
+  const ageMinutes = (now.getTime() - checkedAt) / 60_000;
+
+  if (Number.isNaN(checkedAt) || ageMinutes > 20) {
+    return {
+      freshnessStatus: "stale",
+      freshnessNotice:
+        "Updates are stale. Scores may also be delayed by the data provider.",
+    };
+  }
+
+  if (ageMinutes > 10) {
+    return {
+      freshnessStatus: "delayed",
+      freshnessNotice:
+        "The latest check is delayed. Provider scores may also arrive late.",
+    };
+  }
+
+  return {
+    freshnessStatus: "current",
+    freshnessNotice: "Scores may be delayed by the data provider.",
+  };
 }
 
 function sortMatches(a: SharedBoardMatch, b: SharedBoardMatch) {

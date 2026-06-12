@@ -28,6 +28,7 @@ No active WIP items.
 
 ## Done
 
+- `BL-111` `[Done]` `[Urgent]` `[Bug]`: Reduce delayed-result gaps by polling World Cup matches every five minutes, refreshing teams and flag assets every 30 minutes, automatically refreshing visible participant boards, surfacing honest delayed/stale freshness states, and adding authenticated sync diagnostics with traceable run metadata.
 - `BL-108` `[Done]` `[Urgent]` `[Bug]`: Replace the inadequate daily World Cup sync with authenticated Vercel Pro matchday polling every 30 minutes, retaining the central server-side football-data.org cache and recalculation flow, respecting the provider's 10 requests/minute limit, preserving sync audit records, and adding a configuration contract test for the production schedule.
 - `BL-109` `[Done]` `[Bug]`: Replace participant-facing use of `Final` as a completed-match status with `Completed`, while retaining the internal `final` match status for persistence and scoring, preserving `Final` for the actual tournament stage, updating summary and stats copy, and preventing AI sweepstake updates from describing ordinary completed matches as "finals".
 - `BL-107` `[Done]` `[Bug]`: Make the countdown hero kickoff date formatting deterministic across Vercel server rendering and browser hydration by using the intended tournament display timezone, preventing production-only React text mismatch warnings.

@@ -15,8 +15,10 @@ import { footballDataConfig } from "./types";
 import {
   createSyncRun,
   finishSyncRun,
+  loadCachedMatchSnapshots,
   updateSyncState,
 } from "./cache";
+import type { NormalizedMatchRow } from "./types";
 
 export type FootballDataSyncResult = {
   runId: string;
@@ -31,18 +33,26 @@ export type FootballDataSyncResult = {
 };
 
 const minimumSyncIntervalMs = 60_000;
+export const scheduledMatchSyncIntervalMinutes = 5;
+export const scheduledFullSyncIntervalMinutes = 30;
+
+export type FootballDataSyncMode = "matches" | "full";
+export type FootballDataSyncTrigger = "scheduled" | "manual";
 
 export async function runFootballDataSync(options?: {
   supabase?: SupabaseClient;
   client?: FootballDataClient;
   now?: () => Date;
   tournamentCode?: string;
+  trigger?: FootballDataSyncTrigger;
+  forceFullSync?: boolean;
 }): Promise<FootballDataSyncResult> {
   const supabase = options?.supabase ?? getSupabaseServiceRoleClient();
   const now = options?.now ?? (() => new Date());
   const tournament = getFootballDataTournamentByCode(
     options?.tournamentCode ?? footballDataConfig.tournamentCode,
   );
+  const trigger = options?.trigger ?? "manual";
   const latestRun = await loadLatestSyncRun(supabase);
 
   if (
@@ -67,6 +77,15 @@ export async function runFootballDataSync(options?: {
     createFootballDataClient({
       tournamentCode: tournament.code,
     });
+  const lastFullSyncAt = await loadLastSuccessfulFullSyncAt(
+    supabase,
+    tournament.code,
+  );
+  const syncMode = selectFootballDataSyncMode({
+    forceFullSync: options?.forceFullSync ?? trigger === "manual",
+    lastFullSyncAt,
+    now: now(),
+  });
   const metadata = {
     source: "football-data.org",
     competitionCode: tournament.competitionCode,
@@ -75,18 +94,30 @@ export async function runFootballDataSync(options?: {
     tournamentLabel: tournament.label,
     cadence: "central-polling",
     freeTierFreshness: "delayed-scores-supported",
+    providerPlan: "free-delayed-scores",
+    trigger,
+    syncMode,
+    matchSyncIntervalMinutes: scheduledMatchSyncIntervalMinutes,
+    fullSyncIntervalMinutes: scheduledFullSyncIntervalMinutes,
+    apiRequestCount: syncMode === "full" ? 2 : 1,
     minimumSyncIntervalSeconds: minimumSyncIntervalMs / 1000,
   } satisfies Json;
   const runId = await createSyncRun(supabase, metadata);
 
   try {
-    const [teams, matches] = await Promise.all([
-      client.getTeams(),
-      client.getMatches(),
-    ]);
+    const { teams, matches } = await fetchFootballDataPayload(client, syncMode);
     const normalized = normalizeFootballDataPayload(
       { teams, matches },
       tournament.code,
+    );
+    const previousMatches = await loadCachedMatchSnapshots(
+      supabase,
+      tournament.code,
+      normalized.matchRows.map((match) => match.external_id),
+    );
+    const matchTransitions = buildMatchTransitions(
+      previousMatches,
+      normalized.matchRows,
     );
     const cacheResult = await cacheFootballData(supabase, {
       teams: normalized.teamRows,
@@ -95,7 +126,10 @@ export async function runFootballDataSync(options?: {
     }, {
       tournamentCode: tournament.code,
     });
-    const flagAssetResult = await tryCacheTeamFlagAssets(supabase, tournament.code);
+    const flagAssetResult =
+      syncMode === "full"
+        ? await tryCacheTeamFlagAssets(supabase, tournament.code)
+        : undefined;
     const sourceUpdatedAt = now().toISOString();
     const recalculatedSweepstakes = await recalculateAllSweepstakeScores(
       supabase,
@@ -108,6 +142,9 @@ export async function runFootballDataSync(options?: {
       ...metadata,
       cacheResult,
       flagAssetResult,
+      upstreamStatusCounts: countUpstreamStatuses(matches.matches),
+      upstreamLatestUpdatedAt: getLatestUpstreamUpdatedAt(matches.matches),
+      matchTransitions,
       recalculatedSweepstakes,
       lastSuccessfulSyncAt: sourceUpdatedAt,
     } satisfies Json;
@@ -223,6 +260,101 @@ export function shouldSkipFootballDataSync(
   return now.getTime() - lastStartedTime < minimumIntervalMs;
 }
 
+export function selectFootballDataSyncMode(input: {
+  forceFullSync: boolean;
+  lastFullSyncAt: string | null;
+  now: Date;
+}): FootballDataSyncMode {
+  if (input.forceFullSync || !input.lastFullSyncAt) {
+    return "full";
+  }
+
+  const lastFullSyncTime = new Date(input.lastFullSyncAt).getTime();
+
+  if (Number.isNaN(lastFullSyncTime)) {
+    return "full";
+  }
+
+  return input.now.getTime() - lastFullSyncTime >=
+    scheduledFullSyncIntervalMinutes * 60_000
+    ? "full"
+    : "matches";
+}
+
+export function buildMatchTransitions(
+  previousMatches: Array<{
+    external_id: string;
+    status: string;
+    home_score: number | null;
+    away_score: number | null;
+  }>,
+  nextMatches: NormalizedMatchRow[],
+) {
+  const previousByExternalId = new Map(
+    previousMatches.map((match) => [match.external_id, match]),
+  );
+
+  return nextMatches.flatMap((match) => {
+    const previous = previousByExternalId.get(match.external_id);
+
+    if (
+      !previous ||
+      (previous.status === match.status &&
+        previous.home_score === match.home_score &&
+        previous.away_score === match.away_score)
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        matchId: match.external_id,
+        previousStatus: previous.status,
+        nextStatus: match.status,
+        previousScore: [previous.home_score, previous.away_score],
+        nextScore: [match.home_score, match.away_score],
+      },
+    ];
+  });
+}
+
+export async function fetchFootballDataPayload(
+  client: FootballDataClient,
+  syncMode: FootballDataSyncMode,
+) {
+  const [teams, matches] = await Promise.all([
+    syncMode === "full" ? client.getTeams() : Promise.resolve({ teams: [] }),
+    client.getMatches(),
+  ]);
+
+  return { teams, matches };
+}
+
+function countUpstreamStatuses(
+  matches: Array<{ status: string }>,
+) {
+  return matches.reduce<Record<string, number>>((counts, match) => {
+    counts[match.status] = (counts[match.status] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function getLatestUpstreamUpdatedAt(
+  matches: Array<{ lastUpdated?: string }>,
+) {
+  return matches.reduce<string | null>((latest, match) => {
+    if (!match.lastUpdated) {
+      return latest;
+    }
+
+    if (!latest || new Date(match.lastUpdated) > new Date(latest)) {
+      return match.lastUpdated;
+    }
+
+    return latest;
+  }, null);
+}
+
 async function loadLatestSyncRun(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("football_data_sync_runs")
@@ -236,4 +368,37 @@ async function loadLatestSyncRun(supabase: SupabaseClient) {
   }
 
   return data;
+}
+
+async function loadLastSuccessfulFullSyncAt(
+  supabase: SupabaseClient,
+  tournamentCode: string,
+) {
+  const { data, error } = await supabase
+    .from("football_data_sync_runs")
+    .select("finished_at, metadata")
+    .eq("status", "succeeded")
+    .order("started_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    throw error;
+  }
+
+  const fullRun = (data ?? []).find((run) => {
+    if (
+      typeof run.metadata !== "object" ||
+      run.metadata == null ||
+      Array.isArray(run.metadata)
+    ) {
+      return false;
+    }
+
+    return (
+      run.metadata.tournamentCode === tournamentCode &&
+      run.metadata.syncMode === "full"
+    );
+  });
+
+  return fullRun?.finished_at ?? null;
 }
