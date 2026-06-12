@@ -578,8 +578,14 @@ function formatSyncFreshness(lastSuccessfulSyncAt: string | null) {
   }
 
   return `Updated ${new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/London",
+    timeZoneName: "short",
   }).format(new Date(lastSuccessfulSyncAt))}`;
 }
 

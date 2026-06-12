@@ -107,6 +107,36 @@ function boardInput(
 }
 
 describe("shared board data mapper", () => {
+  it("formats summer sync timestamps in current UK time using BST", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        syncState: {
+          last_successful_sync_at: "2026-06-12T21:01:00.000Z",
+          updated_at: "2026-06-12T21:01:00.000Z",
+        },
+      }),
+    );
+
+    expect(board.syncState.freshnessLabel).toBe(
+      "Updated 12 Jun 2026, 22:01 BST",
+    );
+  });
+
+  it("formats winter sync timestamps in current UK time using GMT", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        syncState: {
+          last_successful_sync_at: "2026-01-12T21:01:00.000Z",
+          updated_at: "2026-01-12T21:01:00.000Z",
+        },
+      }),
+    );
+
+    expect(board.syncState.freshnessLabel).toBe(
+      "Updated 12 Jan 2026, 21:01 GMT",
+    );
+  });
+
   it("keeps different sweepstakes scoped to their own participants and allocations", () => {
     const firstBoard = buildSharedBoardData(boardInput());
     const secondBoard = buildSharedBoardData(
