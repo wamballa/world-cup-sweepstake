@@ -10,6 +10,8 @@ import type { TeamAllocation } from "@/features/allocation/fair-allocation";
 import { prepareBulkParticipantCreate } from "@/features/participants/bulk-participant-parser";
 import { recalculateSweepstakeScores } from "@/server/football-data/recalculate";
 import { runFootballDataSync } from "@/server/football-data/sync";
+import { getOrCreateSweepstakeUpdate } from "@/server/ai/sweepstake-update";
+import { loadSharedBoardById } from "@/server/shared-board/load-shared-board";
 import {
   defaultFootballDataTournament,
   getFootballDataTournamentByCode,
@@ -644,6 +646,37 @@ export async function saveSweepstakeSettings(input: {
   }
 
   revalidatePath("/admin");
+}
+
+export async function rewriteSweepstakeAiNarrative(input: {
+  sweepstakeId: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const user = await requireCurrentUser();
+
+  await requireSweepstakeAdmin(supabase, user.id, input.sweepstakeId);
+
+  const boardData = await loadSharedBoardById(input.sweepstakeId);
+
+  if (!boardData) {
+    throw new Error("Sweepstake not found.");
+  }
+
+  const result = await getOrCreateSweepstakeUpdate(boardData, {
+    forceRewrite: true,
+    rewrittenBy: user.id,
+  });
+
+  if (result.status !== "ready") {
+    throw new Error(result.message);
+  }
+
+  revalidatePath("/s/[shareToken]", "page");
+
+  return {
+    generatedAt: result.generatedAt,
+    text: result.text,
+  };
 }
 
 export async function saveSweepstakeSharedViewMode(input: {

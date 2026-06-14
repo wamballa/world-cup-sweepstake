@@ -56,7 +56,12 @@ export type Database = {
           source_updated_at: string | null;
           model: string;
           output_text: string;
+          generation_status: "generating" | "ready" | "invalid";
+          generation_reason: string;
+          rewritten_by: string | null;
+          lease_expires_at: string | null;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -66,7 +71,12 @@ export type Database = {
           source_updated_at?: string | null;
           model: string;
           output_text: string;
+          generation_status?: "generating" | "ready" | "invalid";
+          generation_reason?: string;
+          rewritten_by?: string | null;
+          lease_expires_at?: string | null;
           created_at?: string;
+          updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["ai_generations"]["Insert"]>;
       };
@@ -408,6 +418,26 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      claim_ai_generation: {
+        Args: {
+          target_sweepstake_id: string;
+          target_feature_key: string;
+          target_input_hash: string;
+          target_source_updated_at: string | null;
+          target_model: string;
+          target_reason: string;
+          target_rewritten_by?: string | null;
+          force_rewrite?: boolean;
+        };
+        Returns: Array<{
+          generation_id: string;
+          claimed: boolean;
+          previous_output_text: string;
+          created_at: string;
+          updated_at: string;
+          model: string;
+        }>;
+      };
       get_sweepstake_by_share_token: {
         Args: { target_share_token: string };
         Returns: {

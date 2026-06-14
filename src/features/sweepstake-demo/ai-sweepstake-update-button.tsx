@@ -22,6 +22,7 @@ type AiSweepstakeUpdateResponse =
       generatedAt: string;
       freshnessLabel: string;
       model: string;
+      sourceUpdatedAt: string | null;
     }
   | {
       status: "unavailable";
@@ -30,20 +31,21 @@ type AiSweepstakeUpdateResponse =
     };
 
 export function AiSweepstakeUpdateButton({
-  freshnessLabel,
+  sourceUpdatedAt,
   shareToken,
 }: {
-  freshnessLabel: string;
+  sourceUpdatedAt: string | null;
   shareToken: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [requestVersion, setRequestVersion] = useState(0);
   const [response, setResponse] = useState<AiSweepstakeUpdateResponse | null>(
     null,
   );
 
   useEffect(() => {
-    if (!isOpen || response) {
+    if (!isOpen) {
       return;
     }
 
@@ -59,6 +61,7 @@ export function AiSweepstakeUpdateButton({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ shareToken }),
+          cache: "no-store",
           signal: controller.signal,
         });
 
@@ -76,7 +79,6 @@ export function AiSweepstakeUpdateButton({
           status: "unavailable",
           message:
             "AI update is unavailable right now. The scoreboard data above is still the source of truth.",
-          freshnessLabel,
         });
       } finally {
         if (!controller.signal.aborted) {
@@ -88,10 +90,18 @@ export function AiSweepstakeUpdateButton({
     void loadUpdate();
 
     return () => controller.abort();
-  }, [freshnessLabel, isOpen, response, shareToken]);
+  }, [isOpen, requestVersion, shareToken]);
+
+  function handleOpenChange(open: boolean) {
+    setIsOpen(open);
+
+    if (open) {
+      setRequestVersion((current) => current + 1);
+    }
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button
           aria-label="Open AI sweepstake update"
@@ -122,12 +132,18 @@ export function AiSweepstakeUpdateButton({
             Sweepstake pulse check
           </DialogTitle>
           <DialogDescription className="font-semibold text-campaign-muted">
-            Cached sweepstake data. Football-data cache: {freshnessLabel}.
+            Cached sweepstake data. Football-data cache:{" "}
+            {formatAgentFreshness(
+              response?.status === "ready"
+                ? response.sourceUpdatedAt
+                : sourceUpdatedAt,
+            )}
+            .
           </DialogDescription>
         </DialogHeader>
 
         <div className="rounded-3xl bg-white p-4">
-          {isLoading ? (
+          {isLoading && !response ? (
             <div className="flex items-center gap-3 text-sm font-semibold text-campaign-muted">
               <LoaderCircle
                 className="size-5 animate-spin text-campaign-purple"
@@ -142,6 +158,7 @@ export function AiSweepstakeUpdateButton({
               </div>
               <p className="text-xs font-semibold text-campaign-muted">
                 {response.cached ? "Cached update." : "Fresh update."}
+                {isLoading ? " Checking for a newer match update..." : ""}
               </p>
             </div>
           ) : (
@@ -154,4 +171,20 @@ export function AiSweepstakeUpdateButton({
       </DialogContent>
     </Dialog>
   );
+}
+
+export function formatAgentFreshness(value: string | null) {
+  if (!value) {
+    return "awaiting first sync";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/London",
+    timeZoneName: "short",
+  }).format(new Date(value));
 }

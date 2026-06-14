@@ -106,12 +106,56 @@ const historicalTournamentMigration = readFileSync(
   "utf8",
 );
 
+const aiLifecycleMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260614110000_ai_generation_lifecycle.sql",
+  ),
+  "utf8",
+);
+
+const aiCacheRepairMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260614143000_repair_ai_generation_cache_constraint.sql",
+  ),
+  "utf8",
+);
+
 describe("AI generation cache migration contract", () => {
   it("deduplicates AI generations by sweepstake, feature, and input hash", () => {
     expect(aiCacheMigration).toContain(
       "ai_generations_sweepstake_feature_hash_idx",
     );
     expect(aiCacheMigration).toContain(
+      "on public.ai_generations(sweepstake_id, feature_key, input_hash)",
+    );
+  });
+
+  it("serializes generation and records admin rewrites", () => {
+    expect(aiLifecycleMigration).toContain(
+      "create or replace function public.claim_ai_generation",
+    );
+    expect(aiLifecycleMigration).toContain("generation_status");
+    expect(aiLifecycleMigration).toContain("generation_reason");
+    expect(aiLifecycleMigration).toContain("rewritten_by");
+    expect(aiLifecycleMigration).toContain("lease_expires_at");
+    expect(aiLifecycleMigration).toContain(
+      "'generating', 'ready', 'invalid'",
+    );
+    expect(aiLifecycleMigration).toContain("grant execute");
+    expect(aiLifecycleMigration).toContain("to service_role");
+  });
+
+  it("repairs the production cache-key constraint used by generation claims", () => {
+    expect(aiCacheRepairMigration).toContain(
+      "create unique index ai_generations_claim_unique_idx",
+    );
+    expect(aiCacheRepairMigration).toContain(
       "on public.ai_generations(sweepstake_id, feature_key, input_hash)",
     );
   });

@@ -16,6 +16,7 @@ import {
   Share2,
   ShieldCheck,
   Shuffle,
+  Sparkles,
   Trophy,
   Users,
 } from "lucide-react";
@@ -69,6 +70,7 @@ import {
   saveSweepstakeAllocation,
   saveSweepstakeSharedViewMode,
   saveSweepstakeSettings,
+  rewriteSweepstakeAiNarrative,
   updateSweepstakeParticipant,
 } from "@/app/admin/actions";
 import {
@@ -182,6 +184,7 @@ export function AppShell({
   const [moveParticipantId, setMoveParticipantId] = useState("");
   const [shareCopied, setShareCopied] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
+  const [isRewritingAi, setIsRewritingAi] = useState(false);
   const teams = activeSweepstake?.teams ?? [];
 
   const duplicateNames = useMemo(
@@ -653,6 +656,28 @@ export function AppShell({
     setSaveStatus("Settings saved to your account.");
   }
 
+  async function rewriteAiNarrative() {
+    if (!activeSweepstake || isRewritingAi) {
+      return;
+    }
+
+    setIsRewritingAi(true);
+    setSaveStatus("Rewriting the AI narrative...");
+
+    try {
+      await rewriteSweepstakeAiNarrative({
+        sweepstakeId: activeSweepstake.id,
+      });
+      setSaveStatus(
+        "AI narrative rewritten. Participants will see it the next time the Agent checks for an update.",
+      );
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    } finally {
+      setIsRewritingAi(false);
+    }
+  }
+
   async function archiveSweepstakeFromAccount() {
     if (!activeSweepstake || !activeSweepstake.isOwner) {
       return;
@@ -747,6 +772,7 @@ export function AppShell({
                 shareLink={shareLink}
                 sharedViewMode={sharedViewMode}
                 isOwner={activeSweepstake?.isOwner ?? false}
+                isRewritingAi={isRewritingAi}
                 saveStatus={saveStatus}
                 spread={spread}
                 sweepstakeName={sweepstakeName}
@@ -774,6 +800,7 @@ export function AppShell({
                 onParticipantNameDraftChange={setParticipantName}
                 onSaveParticipantEdit={saveParticipantEdit}
                 onRunAllocation={runAllocation}
+                onRewriteAiNarrative={rewriteAiNarrative}
                 onSaveSettings={saveSettingsToAccount}
                 onSweepstakeNameChange={setSweepstakeName}
                 onTournamentChange={changeTournamentYear}
@@ -1102,6 +1129,7 @@ function SweepstakeAdminTabs({
   shareLink,
   sharedViewMode,
   isOwner,
+  isRewritingAi,
   saveStatus,
   spread,
   sweepstakeName,
@@ -1125,6 +1153,7 @@ function SweepstakeAdminTabs({
   onParticipantNameDraftChange,
   onSaveParticipantEdit,
   onRunAllocation,
+  onRewriteAiNarrative,
   onSaveSettings,
   onSweepstakeNameChange,
   onTournamentChange,
@@ -1147,6 +1176,7 @@ function SweepstakeAdminTabs({
   shareLink: string;
   sharedViewMode: SharedViewMode;
   isOwner: boolean;
+  isRewritingAi: boolean;
   saveStatus: string;
   spread: { min: number; max: number };
   sweepstakeName: string;
@@ -1178,6 +1208,7 @@ function SweepstakeAdminTabs({
     value: string,
   ) => void;
   onRunAllocation: (action: "initial-draw" | "rerun") => void;
+  onRewriteAiNarrative: () => void;
   onSaveSettings: () => void;
   onSweepstakeNameChange: (value: string) => void;
   onTournamentChange: (tournamentCode: string) => void;
@@ -1283,11 +1314,13 @@ function SweepstakeAdminTabs({
           <SettingsTab
             adminEmails={adminEmails}
             isOwner={isOwner}
+            isRewritingAi={isRewritingAi}
             sweepstakeName={sweepstakeName}
             teamCount={teams.length}
             tournamentCode={tournamentCode}
             onArchiveSweepstake={onArchiveSweepstake}
             onAdminEmailsChange={onAdminEmailsChange}
+            onRewriteAiNarrative={onRewriteAiNarrative}
             onSaveSettings={onSaveSettings}
             onSweepstakeNameChange={onSweepstakeNameChange}
             onTournamentChange={onTournamentChange}
@@ -1709,22 +1742,26 @@ function ParticipantsTab({
 function SettingsTab({
   adminEmails,
   isOwner,
+  isRewritingAi,
   sweepstakeName,
   teamCount,
   tournamentCode,
   onArchiveSweepstake,
   onAdminEmailsChange,
+  onRewriteAiNarrative,
   onSaveSettings,
   onSweepstakeNameChange,
   onTournamentChange,
 }: {
   adminEmails: string;
   isOwner: boolean;
+  isRewritingAi: boolean;
   sweepstakeName: string;
   teamCount: number;
   tournamentCode: string;
   onArchiveSweepstake: () => void;
   onAdminEmailsChange: (value: string) => void;
+  onRewriteAiNarrative: () => void;
   onSaveSettings: () => void;
   onSweepstakeNameChange: (value: string) => void;
   onTournamentChange: (tournamentCode: string) => void;
@@ -1835,6 +1872,51 @@ function SettingsTab({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="size-4 text-primary" aria-hidden="true" />
+            AI Agent narrative
+          </CardTitle>
+          <CardDescription>
+            Normal page refreshes and Agent opens reuse the cached narrative.
+            Use this only when you want a fresh rewrite from the same stored
+            sweepstake facts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button disabled={isRewritingAi} variant="outline">
+                <Sparkles className="size-4" aria-hidden="true" />
+                {isRewritingAi
+                  ? "Rewriting AI narrative..."
+                  : "Rewrite AI narrative"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Rewrite the AI narrative?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This makes one new OpenAI request and uses AI tokens even when
+                  no match has changed. The rewrite remains grounded only in the
+                  current cached sweepstake data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={isRewritingAi}
+                  onClick={onRewriteAiNarrative}
+                >
+                  Rewrite narrative
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
 
       {isOwner ? (
         <Card className="border-destructive/25">

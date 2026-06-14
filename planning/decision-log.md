@@ -1,5 +1,23 @@
 # Decision Log
 
+## 2026-06-14: BL-113 UK Kickoff Time Formatting
+
+Decision: Keep football-data.org `utcDate` values and Supabase `kickoff_at` timestamps as UTC instants, but format all participant-facing kickoff labels with `timeZone: "Europe/London"` and omit timezone abbreviations from the displayed label. The shared-board DTO remains the single formatting boundary used by match tables, countdowns, personal match summaries, and AI fixture context.
+
+Reason: Vercel renders in UTC, so implicit date formatting displayed Germany v Curaçao at `17:00` even though `2026-06-14T17:00:00Z` is `18:00 BST`. Explicit London formatting is deterministic across server, browser, local development, and daylight-saving transitions without changing authoritative football data.
+
+## 2026-06-14: BL-112 Match-Based AI Narrative Lifecycle
+
+Decision: Cache AI Agent narratives by prompt version, completed match IDs and scores, resulting standings, allocations, and badge holders. Browser refreshes, repeated Agent opens, live-score changes, upcoming-fixture changes, and routine football-data sync timestamps do not invalidate the narrative. The first Agent open after one or more newly completed matches generates one combined update, protected by a database-backed generation lease so concurrent viewers share one OpenAI request.
+
+Decision: Add a confirmed admin-only `Rewrite AI narrative` action with no cooldown. Each confirmed action may make one OpenAI request from current cached app facts, atomically replaces the narrative for the current factual state, records the successful rewrite and actor, and preserves the previous narrative if generation fails.
+
+Decision: Use a warm, dry, office-safe "witty colleague" voice with at most one humorous observation, no forced jokes or stock football clichés, and no year in Agent-facing freshness dates. All existing grounding, scoring, delayed-data, gambling, and anti-hallucination rules remain unchanged.
+
+Update: Treat generated prose as untrusted until deterministic checks confirm that competition-state wording, completed scorelines, fixtures, team names, participant points, ranks, and shared-place counts are supported by the prompt payload. Retry one rejected draft with explicit correction instructions; if the second draft fails or generation errors, retain and serve the previous valid narrative.
+
+Reason: Match-based invalidation keeps participant commentary current at useful milestones without spending tokens on browser refreshes or polling noise. The explicit admin override provides editorial control while confirmation makes the token cost visible.
+
 ## 2026-06-12: BL-111 Five-Minute Match Sync And Diagnostics
 
 Decision: Run the protected production cron every five minutes. Scheduled runs always fetch matches, while teams and flag assets refresh when the last successful full sync is at least 30 minutes old. Manual and historical-dataset syncs remain full refreshes. Persist the trigger, sync mode, configured cadence, API request count, upstream status summary, latest upstream update time, and match status/score transitions in the existing sync-run metadata. Refresh visible participant boards every 60 seconds and expose sanitized sync health and recent runs only to authenticated admins.
