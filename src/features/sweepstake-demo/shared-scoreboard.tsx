@@ -1,6 +1,7 @@
 import {
   Bell,
   CalendarDays,
+  CircleHelp,
   Gauge,
   Medal,
   RefreshCw,
@@ -91,7 +92,7 @@ export function SharedScoreboard({
 
       <CampaignPanel className="p-3 sm:p-4">
         <Tabs defaultValue="participants" className="gap-4">
-          <TabsList className="grid h-auto w-full grid-cols-5 rounded-2xl bg-campaign-lavender/40 p-1">
+          <TabsList className="grid h-auto w-full grid-cols-6 rounded-2xl bg-campaign-lavender/40 p-1">
             <TabsTrigger
               value="participants"
               className={sharedBoardTabTriggerClassName}
@@ -132,6 +133,14 @@ export function SharedScoreboard({
               <Gauge className="size-4" aria-hidden="true" />
               <span className="hidden sm:inline">Stats</span>
             </TabsTrigger>
+            <TabsTrigger
+              value="explainer"
+              className={sharedBoardTabTriggerClassName}
+              aria-label="Explainer"
+            >
+              <CircleHelp className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Explainer</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="participants">
@@ -161,6 +170,9 @@ export function SharedScoreboard({
               delayedMatches={boardData.summary.delayedMatchCount}
               scheduledMatches={boardData.summary.scheduledMatchCount}
             />
+          </TabsContent>
+          <TabsContent value="explainer">
+            <ExplainerPanel />
           </TabsContent>
         </Tabs>
       </CampaignPanel>
@@ -707,6 +719,59 @@ function StatsPanel({
         body="Scheduled or delayed fixtures still awaiting completed results."
       />
     </div>
+  );
+}
+
+const scoringRows = [
+  ["Group win", "3 pts"],
+  ["Group draw", "1 pt"],
+  ["Reach Round of 16", "+5 pts"],
+  ["Reach quarter-final", "+8 pts"],
+  ["Reach semi-final", "+12 pts"],
+  ["Runner-up", "+15 pts"],
+  ["Win the World Cup", "+25 pts"],
+] as const;
+
+function ExplainerPanel() {
+  return (
+    <CampaignPanel className="overflow-hidden p-0">
+      <div className="bg-campaign-purple px-4 py-5 text-white sm:px-6">
+        <p className="text-xs font-black uppercase tracking-normal">
+          Explainer
+        </p>
+        <h3 className="mt-1 text-2xl font-black">How scoring works</h3>
+        <p className="mt-1 text-sm font-semibold text-white/85">
+          Your teams play. You get the points.
+        </p>
+      </div>
+
+      <div className="divide-y divide-campaign-ring">
+        {scoringRows.map(([label, points]) => (
+          <div
+            className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6"
+            key={label}
+          >
+            <span className="text-sm font-semibold text-campaign-muted">
+              {label}
+            </span>
+            <span className="shrink-0 font-black text-campaign-purple-strong">
+              {points}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3 bg-campaign-yellow/35 px-4 py-5 sm:px-6">
+        <p className="text-sm font-semibold text-campaign-ink">
+          If you have more than one team, their points are added together.
+          Extra teams are handed out randomly. It&apos;s all part of the luck
+          of the draw.
+        </p>
+        <p className="font-black text-campaign-purple-strong">
+          No predictions. No football knowledge needed.
+        </p>
+      </div>
+    </CampaignPanel>
   );
 }
 
