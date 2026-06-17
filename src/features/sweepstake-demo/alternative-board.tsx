@@ -26,7 +26,13 @@ import type { SharedBoardData } from "@/features/shared-board/shared-board-data"
 const alternativeBoardTableHeadClassName =
   "bg-campaign-muted font-black text-white hover:bg-campaign-muted hover:text-white";
 
-export function AlternativeBoard({ boardData }: { boardData: SharedBoardData }) {
+export function AlternativeBoard({
+  boardData,
+  movementByParticipantId = {},
+}: {
+  boardData: SharedBoardData;
+  movementByParticipantId?: Record<string, string>;
+}) {
   const rows = buildAlternativeBoardRows(boardData);
   const leader = rows[0];
   const topScore = leader?.displayAlternativeScore ?? "0";
@@ -126,6 +132,9 @@ export function AlternativeBoard({ boardData }: { boardData: SharedBoardData }) 
                     Rank
                   </TableHead>
                   <TableHead className={alternativeBoardTableHeadClassName}>
+                    Change
+                  </TableHead>
+                  <TableHead className={alternativeBoardTableHeadClassName}>
                     Participant
                   </TableHead>
                   <TableHead className={alternativeBoardTableHeadClassName}>
@@ -162,6 +171,9 @@ export function AlternativeBoard({ boardData }: { boardData: SharedBoardData }) 
                       >
                         #{row.rank}
                       </div>
+                    </TableCell>
+                    <TableCell className="font-black text-campaign-purple-strong">
+                      {movementByParticipantId[row.participantId] ?? "-"}
                     </TableCell>
                     <TableCell className="font-black text-campaign-ink">
                       {row.name}
