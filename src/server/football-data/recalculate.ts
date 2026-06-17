@@ -14,6 +14,7 @@ import {
   type TournamentStage,
 } from "@/features/scoring/sweepstake-scoring";
 import { replacePersistedScores } from "@/server/persistence/scores";
+import type { RecalculatedSweepstakeSnapshotInput } from "@/server/persistence/leaderboard-snapshots";
 import type { Database } from "@/server/supabase/database.types";
 
 import { footballDataConfig } from "./types";
@@ -41,7 +42,7 @@ export async function recalculateAllSweepstakeScores(
 ) {
   let sweepstakesQuery = supabase
     .from("sweepstakes")
-    .select("id, tournament_code");
+    .select("id, tournament_code, status");
 
   if (tournamentCode) {
     sweepstakesQuery = sweepstakesQuery.eq("tournament_code", tournamentCode);
@@ -62,6 +63,7 @@ export async function recalculateAllSweepstakeScores(
   >();
 
   let recalculatedCount = 0;
+  const recalculatedSweepstakes: RecalculatedSweepstakeSnapshotInput[] = [];
 
   for (const sweepstake of sweepstakes ?? []) {
     const sweepstakeTournamentCode =
@@ -79,24 +81,30 @@ export async function recalculateAllSweepstakeScores(
       cachedInputsByTournament.set(sweepstakeTournamentCode, cachedInputs);
     }
 
-    const wasRecalculated = await recalculateSweepstakeScoresWithCachedInputs(
+    const recalculatedSweepstake = await recalculateSweepstakeScoresWithCachedInputs(
       supabase,
       {
         sweepstakeId: sweepstake.id,
+        tournamentCode: sweepstakeTournamentCode,
+        status: sweepstake.status,
         sourceUpdatedAt,
         teamScores: cachedInputs.teamScores,
         teamPerformances: cachedInputs.teamPerformances,
       },
     );
 
-    if (!wasRecalculated) {
+    if (!recalculatedSweepstake) {
       continue;
     }
 
     recalculatedCount += 1;
+    recalculatedSweepstakes.push(recalculatedSweepstake);
   }
 
-  return recalculatedCount;
+  return {
+    count: recalculatedCount,
+    recalculatedSweepstakes,
+  };
 }
 
 export async function recalculateSweepstakeScores(
@@ -114,6 +122,8 @@ export async function recalculateSweepstakeScores(
 
   return recalculateSweepstakeScoresWithCachedInputs(supabase, {
     sweepstakeId,
+    tournamentCode: sweepstakeTournamentCode,
+    status: "shared",
     sourceUpdatedAt,
     teamScores,
     teamPerformances,
@@ -124,6 +134,8 @@ async function recalculateSweepstakeScoresWithCachedInputs(
   supabase: SupabaseClient,
   input: {
     sweepstakeId: string;
+    tournamentCode: string;
+    status: string;
     sourceUpdatedAt: string;
     teamScores: ReturnType<typeof calculateTeamScores>;
     teamPerformances: TeamPerformanceInput[];
@@ -175,7 +187,15 @@ async function recalculateSweepstakeScoresWithCachedInputs(
     })),
   });
 
-  return true;
+  return {
+    sweepstakeId: input.sweepstakeId,
+    tournamentCode: input.tournamentCode,
+    status: input.status,
+    participants,
+    allocations,
+    teamScores: input.teamScores,
+    participantScores,
+  } satisfies RecalculatedSweepstakeSnapshotInput;
 }
 
 export function buildTeamPerformances(

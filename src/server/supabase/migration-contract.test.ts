@@ -126,6 +126,16 @@ const aiCacheRepairMigration = readFileSync(
   "utf8",
 );
 
+const leaderboardSnapshotsMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260617150000_leaderboard_snapshots.sql",
+  ),
+  "utf8",
+);
+
 describe("AI generation cache migration contract", () => {
   it("deduplicates AI generations by sweepstake, feature, and input hash", () => {
     expect(aiCacheMigration).toContain(
@@ -175,5 +185,42 @@ describe("Historical World Cup tournament migration contract", () => {
     expect(historicalTournamentMigration).not.toContain(
       "add value if not exists 'tournament_reset'",
     );
+  });
+});
+
+describe("Leaderboard snapshot migration contract", () => {
+  it("adds append-only leaderboard snapshot tables", () => {
+    expect(leaderboardSnapshotsMigration).toContain(
+      "create type public.leaderboard_snapshot_trigger",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "create table public.leaderboard_snapshots",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "create table public.leaderboard_snapshot_rows",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "unique (sweepstake_id, snapshot_key)",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "leaderboard_snapshots_initial_baseline_unique_idx",
+    );
+  });
+
+  it("keeps snapshot data behind admin-only RLS reads", () => {
+    expect(leaderboardSnapshotsMigration).toContain(
+      "alter table public.leaderboard_snapshots enable row level security;",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "alter table public.leaderboard_snapshot_rows enable row level security;",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      'create policy "leaderboard snapshots admin read"',
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      'create policy "leaderboard snapshot rows admin read"',
+    );
+    expect(leaderboardSnapshotsMigration).not.toContain("for insert");
+    expect(leaderboardSnapshotsMigration).not.toContain("to anon");
   });
 });

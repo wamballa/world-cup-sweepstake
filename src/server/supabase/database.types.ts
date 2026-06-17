@@ -14,6 +14,10 @@ export type Database = {
         | "rerun"
         | "manual_move";
       badge_status: "active" | "undecided" | "manual_future";
+      leaderboard_snapshot_trigger:
+        | "initial_baseline"
+        | "completed_match_change"
+        | "manual_recalculation";
       match_status:
         | "scheduled"
         | "delayed"
@@ -127,6 +131,74 @@ export type Database = {
           calculated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["badge_holders"]["Insert"]>;
+      };
+      leaderboard_snapshots: {
+        Row: {
+          id: string;
+          sweepstake_id: string;
+          tournament_code: string;
+          sync_run_id: string | null;
+          trigger_type: Database["public"]["Enums"]["leaderboard_snapshot_trigger"];
+          snapshot_key: string;
+          completed_match_count: number;
+          latest_completed_match_id: string | null;
+          changed_match_ids: string[];
+          match_transition_summary: Json;
+          source_updated_at: string | null;
+          snapshot_reason: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          sweepstake_id: string;
+          tournament_code: string;
+          sync_run_id?: string | null;
+          trigger_type: Database["public"]["Enums"]["leaderboard_snapshot_trigger"];
+          snapshot_key: string;
+          completed_match_count?: number;
+          latest_completed_match_id?: string | null;
+          changed_match_ids?: string[];
+          match_transition_summary?: Json;
+          source_updated_at?: string | null;
+          snapshot_reason: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["leaderboard_snapshots"]["Insert"]>;
+      };
+      leaderboard_snapshot_rows: {
+        Row: {
+          id: string;
+          snapshot_id: string;
+          participant_id: string;
+          participant_name: string;
+          official_rank: number;
+          official_points: number;
+          official_team_count: number;
+          official_team_ids: string[];
+          alternative_rank: number;
+          alternative_score: number;
+          alternative_total_points: number;
+          alternative_team_count: number;
+          alternative_team_ids: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          snapshot_id: string;
+          participant_id: string;
+          participant_name: string;
+          official_rank: number;
+          official_points: number;
+          official_team_count: number;
+          official_team_ids?: string[];
+          alternative_rank: number;
+          alternative_score: number;
+          alternative_total_points: number;
+          alternative_team_count: number;
+          alternative_team_ids?: string[];
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["leaderboard_snapshot_rows"]["Insert"]>;
       };
       participants: {
         Row: {
