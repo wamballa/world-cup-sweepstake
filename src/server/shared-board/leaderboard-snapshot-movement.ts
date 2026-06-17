@@ -7,6 +7,10 @@ import type { Database } from "@/server/supabase/database.types";
 
 export type LeaderboardMovementDisplay = "+" | "-" | `+${number}` | `-${number}`;
 export type LeaderboardMovementMap = Record<string, LeaderboardMovementDisplay>;
+export type LeaderboardSnapshotMovement = {
+  officialMovementByParticipantId: LeaderboardMovementMap;
+  alternativeMovementByParticipantId: LeaderboardMovementMap;
+};
 
 export type SnapshotMovementRow = {
   snapshot_id: string;
@@ -27,7 +31,7 @@ export async function loadLatestLeaderboardSnapshotMovement(
 export async function loadLatestLeaderboardSnapshotMovementWithClient(
   supabase: SupabaseClient<Database>,
   sweepstakeId: string,
-): Promise<LeaderboardMovementMap> {
+): Promise<LeaderboardSnapshotMovement> {
   const { data: snapshots, error: snapshotsError } = await supabase
     .from("leaderboard_snapshots")
     .select("id")
@@ -42,14 +46,14 @@ export async function loadLatestLeaderboardSnapshotMovementWithClient(
   const latestSnapshots = (snapshots ?? []) as Array<{ id: string }>;
 
   if (latestSnapshots.length < 2) {
-    return {};
+    return emptyMovement();
   }
 
   const latestSnapshotId = latestSnapshots[0]?.id;
   const previousSnapshotId = latestSnapshots[1]?.id;
 
   if (!latestSnapshotId || !previousSnapshotId) {
-    return {};
+    return emptyMovement();
   }
 
   const { data: rows, error: rowsError } = await supabase
@@ -61,18 +65,18 @@ export async function loadLatestLeaderboardSnapshotMovementWithClient(
     throw rowsError;
   }
 
-  return buildAlternativeRankMovement({
+  return buildRankMovements({
     latestSnapshotId,
     previousSnapshotId,
     rows: (rows ?? []) as SnapshotMovementRow[],
   });
 }
 
-export function buildAlternativeRankMovement(input: {
+export function buildRankMovements(input: {
   latestSnapshotId: string;
   previousSnapshotId: string;
   rows: SnapshotMovementRow[];
-}): LeaderboardMovementMap {
+}): LeaderboardSnapshotMovement {
   const previousRowsByParticipant = new Map(
     input.rows
       .filter((row) => row.snapshot_id === input.previousSnapshotId)
@@ -82,18 +86,50 @@ export function buildAlternativeRankMovement(input: {
     (row) => row.snapshot_id === input.latestSnapshotId,
   );
 
-  return Object.fromEntries(
-    latestRows.map((latestRow) => {
-      const previousRow = previousRowsByParticipant.get(latestRow.participant_id);
-      const movement = previousRow
-        ? formatRankMovement(
-            previousRow.alternative_rank - latestRow.alternative_rank,
-          )
-        : "-";
+  return {
+    officialMovementByParticipantId: Object.fromEntries(
+      latestRows.map((latestRow) => {
+        const previousRow = previousRowsByParticipant.get(
+          latestRow.participant_id,
+        );
+        const movement = previousRow
+          ? formatRankMovement(previousRow.official_rank - latestRow.official_rank)
+          : "-";
 
-      return [latestRow.participant_id, movement];
-    }),
-  );
+        return [latestRow.participant_id, movement];
+      }),
+    ),
+    alternativeMovementByParticipantId: Object.fromEntries(
+      latestRows.map((latestRow) => {
+        const previousRow = previousRowsByParticipant.get(
+          latestRow.participant_id,
+        );
+        const movement = previousRow
+          ? formatRankMovement(
+              previousRow.alternative_rank - latestRow.alternative_rank,
+            )
+          : "-";
+
+        return [latestRow.participant_id, movement];
+      }),
+    ),
+  };
+}
+
+export function buildAlternativeRankMovement(input: {
+  latestSnapshotId: string;
+  previousSnapshotId: string;
+  rows: SnapshotMovementRow[];
+}): LeaderboardMovementMap {
+  return buildRankMovements(input).alternativeMovementByParticipantId;
+}
+
+export function buildOfficialRankMovement(input: {
+  latestSnapshotId: string;
+  previousSnapshotId: string;
+  rows: SnapshotMovementRow[];
+}): LeaderboardMovementMap {
+  return buildRankMovements(input).officialMovementByParticipantId;
 }
 
 export function formatRankMovement(delta: number): LeaderboardMovementDisplay {
@@ -106,4 +142,11 @@ export function formatRankMovement(delta: number): LeaderboardMovementDisplay {
   }
 
   return "-";
+}
+
+function emptyMovement(): LeaderboardSnapshotMovement {
+  return {
+    officialMovementByParticipantId: {},
+    alternativeMovementByParticipantId: {},
+  };
 }

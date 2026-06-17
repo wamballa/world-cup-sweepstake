@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAlternativeBoardRows, formatAlternativeScore } from "./alternative-board-data";
+import {
+  buildAlternativeBoardRows,
+  buildAlternativeTeamBoardRows,
+  formatAlternativeScore,
+} from "./alternative-board-data";
 import type { SharedBoardData } from "./shared-board-data";
 
 function boardData(overrides: Partial<SharedBoardData> = {}): SharedBoardData {
@@ -191,6 +195,118 @@ describe("alternative board data", () => {
     expect(formatAlternativeScore(41.54)).toBe("41.5");
     expect(formatAlternativeScore(41.55)).toBe("41.6");
   });
+
+  it("ranks allocated teams by raw team points with shared ranks", () => {
+    const rows = buildAlternativeTeamBoardRows(
+      boardData({
+        teams: [
+          team("argentina", "Argentina", 10, "andy"),
+          team("brazil", "Brazil", 10, "jobin"),
+          team("canada", "Canada", 4, "andy"),
+          {
+            ...team("unallocated", "Unallocated", 99, "nobody"),
+            allocatedTo: null,
+            allocatedToName: null,
+          },
+        ],
+      }),
+    );
+
+    expect(rows.map((row) => [row.teamName, row.rank, row.points])).toEqual([
+      ["Argentina", 1, 10],
+      ["Brazil", 1, 10],
+      ["Canada", 3, 4],
+    ]);
+  });
+
+  it("derives team record and goals from final matches only", () => {
+    const rows = buildAlternativeTeamBoardRows(
+      boardData({
+        teams: [
+          team("japan", "Japan", 6, "andy"),
+          team("norway", "Norway", 3, "jobin"),
+        ],
+        matches: [
+          match({
+            id: "final-win",
+            status: "final",
+            homeTeamId: "japan",
+            homeTeamName: "Japan",
+            awayTeamId: "norway",
+            awayTeamName: "Norway",
+            homeScore: 2,
+            awayScore: 1,
+          }),
+          match({
+            id: "scheduled-ignored",
+            status: "scheduled",
+            homeTeamId: "japan",
+            homeTeamName: "Japan",
+            awayTeamId: "norway",
+            awayTeamName: "Norway",
+            homeScore: null,
+            awayScore: null,
+          }),
+        ],
+      }),
+    );
+
+    expect(rows[0]).toMatchObject({
+      teamName: "Japan",
+      wins: 1,
+      draws: 0,
+      losses: 0,
+      goalsFor: 2,
+      goalsAgainst: 1,
+      goalDifference: 1,
+    });
+    expect(rows[1]).toMatchObject({
+      teamName: "Norway",
+      wins: 0,
+      draws: 0,
+      losses: 1,
+      goalsFor: 1,
+      goalsAgainst: 2,
+      goalDifference: -1,
+    });
+  });
+
+  it("finds the earliest non-final next fixture", () => {
+    const rows = buildAlternativeTeamBoardRows(
+      boardData({
+        teams: [
+          team("japan", "Japan", 6, "andy"),
+          team("norway", "Norway", 3, "jobin"),
+        ],
+        matches: [
+          match({
+            id: "later",
+            status: "scheduled",
+            homeTeamId: "japan",
+            homeTeamName: "Japan",
+            awayTeamId: "Norway",
+            awayTeamName: "Norway",
+            kickoffAt: "2026-06-21T20:00:00.000Z",
+            kickoffLabel: "21 Jun 2026, 20:00",
+          }),
+          match({
+            id: "earlier",
+            status: "scheduled",
+            homeTeamId: "norway",
+            homeTeamName: "Norway",
+            awayTeamId: "japan",
+            awayTeamName: "Japan",
+            kickoffAt: "2026-06-20T20:00:00.000Z",
+            kickoffLabel: "20 Jun 2026, 20:00",
+          }),
+        ],
+      }),
+    );
+
+    expect(rows.find((row) => row.teamName === "Japan")?.nextFixture).toBe(
+      "Norway v Japan (20 Jun 2026, 20:00)",
+    );
+  });
 });
 
 function team(
@@ -214,5 +330,28 @@ function team(
     allocatedTo,
     allocatedToName: allocatedTo,
     flagAssetPath: null,
+  };
+}
+
+function match(
+  overrides: Partial<SharedBoardData["matches"][number]>,
+): SharedBoardData["matches"][number] {
+  return {
+    id: "match",
+    stage: "Group",
+    status: "scheduled",
+    homeTeamId: null,
+    awayTeamId: null,
+    homeTeamName: "TBC",
+    awayTeamName: "TBC",
+    homeParticipantName: null,
+    awayParticipantName: null,
+    participantLabel: "TBC",
+    homeScore: null,
+    awayScore: null,
+    kickoffAt: null,
+    kickoffLabel: "Kickoff TBC",
+    freshness: "cached",
+    ...overrides,
   };
 }

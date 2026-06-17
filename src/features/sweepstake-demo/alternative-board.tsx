@@ -12,34 +12,44 @@ import {
   CampaignShell,
 } from "@/components/campaign";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { buildAlternativeBoardRows } from "@/features/shared-board/alternative-board-data";
+  buildAlternativeBoardRows,
+  buildAlternativeTeamBoardRows,
+} from "@/features/shared-board/alternative-board-data";
 import type { SharedBoardData } from "@/features/shared-board/shared-board-data";
 
-const alternativeBoardTableHeadClassName =
-  "bg-campaign-muted font-black text-white hover:bg-campaign-muted hover:text-white";
+const stickyControlClassName =
+  "sticky top-0 z-40 overflow-hidden rounded-2xl bg-campaign-lavender/95 shadow-sm backdrop-blur";
+const headerCellClassName =
+  "bg-campaign-muted px-2 py-3 text-left text-sm font-black text-white";
+const alternativeBoardTabTriggerClassName =
+  "h-9 rounded-xl border-transparent px-2 py-0 font-black leading-none !text-campaign-purple/65 outline-none hover:!text-campaign-purple focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:!border-transparent data-active:!bg-transparent data-active:!text-campaign-purple-strong data-active:!shadow-none data-[state=active]:!border-transparent data-[state=active]:!bg-transparent data-[state=active]:!text-campaign-purple-strong data-[state=active]:!shadow-none";
+const luckGridClassName =
+  "grid min-w-[56rem] grid-cols-[5rem_7rem_minmax(14rem,1.2fr)_minmax(18rem,2fr)_6rem_8rem]";
+const fairPlayGridClassName =
+  "grid min-w-[64rem] grid-cols-[5rem_7rem_minmax(14rem,1.2fr)_minmax(18rem,2fr)_8rem_6rem_9rem]";
+const teamsGridClassName =
+  "grid min-w-[58rem] grid-cols-[5rem_minmax(12rem,1.1fr)_minmax(13rem,1.1fr)_3rem_3rem_3rem_4rem_4rem_4rem_6rem_8rem]";
 
 export function AlternativeBoard({
   boardData,
-  movementByParticipantId = {},
+  officialMovementByParticipantId = {},
+  alternativeMovementByParticipantId = {},
+  initialTab = "luck",
 }: {
   boardData: SharedBoardData;
-  movementByParticipantId?: Record<string, string>;
+  officialMovementByParticipantId?: Record<string, string>;
+  alternativeMovementByParticipantId?: Record<string, string>;
+  initialTab?: "luck" | "fair" | "teams";
 }) {
-  const rows = buildAlternativeBoardRows(boardData);
-  const leader = rows[0];
+  const fairPlayRows = buildAlternativeBoardRows(boardData);
+  const leader = fairPlayRows[0];
   const topScore = leader?.displayAlternativeScore ?? "0";
-  const topTiedPlayerCount = rows.filter((row) => row.rank === 1).length;
+  const topTiedPlayerCount = fairPlayRows.filter((row) => row.rank === 1).length;
 
   return (
-    <CampaignShell>
+    <CampaignShell className="overflow-x-visible">
       <CampaignPageStack>
         <CampaignHeader
           logo={
@@ -62,8 +72,8 @@ export function AlternativeBoard({
               />
               <HeaderMetric
                 icon={<BarChart3 className="size-5" aria-hidden="true" />}
-                label="Mode"
-                value="Average"
+                label="Views"
+                value="3 tabs"
               />
             </div>
           }
@@ -82,13 +92,13 @@ export function AlternativeBoard({
                 Alternative Board
               </Badge>
               <h2 className="mt-3 text-4xl font-black leading-none text-white sm:text-5xl">
-                Average score per assigned team
+                Hidden comparison board
               </h2>
               <p className="mt-3 max-w-2xl text-sm font-semibold text-white/90 sm:text-base">
                 This is an experimental alternative board. The official
-                leaderboard remains the Luck of the Draw table. This board uses
-                average score per assigned team so participants with one team
-                and two teams can be compared more evenly.
+                leaderboard remains the Luck of the Draw table. Use these tabs
+                to compare total score, average score per assigned team, and
+                individual team performance.
               </p>
               <p className="mt-1 max-w-2xl text-xs font-semibold text-white/80 sm:text-sm">
                 Cached tournament data. {boardData.syncState.freshnessLabel}.
@@ -100,7 +110,7 @@ export function AlternativeBoard({
                 label="Players tied"
                 value={`${topTiedPlayerCount}`}
               />
-              <HeroMetric label="Players" value={`${rows.length}`} />
+              <HeroMetric label="Players" value={`${fairPlayRows.length}`} />
             </div>
           </div>
         </CampaignPanel>
@@ -109,7 +119,7 @@ export function AlternativeBoard({
           <div className="grid gap-2 sm:grid-cols-3">
             <CampaignMetric
               label="Scoring"
-              value="Average"
+              value="Comparison"
               tone="yellow"
             />
             <CampaignMetric
@@ -124,90 +134,26 @@ export function AlternativeBoard({
             />
           </div>
 
-          <div className="overflow-hidden rounded-2xl bg-campaign-panel-soft">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className={alternativeBoardTableHeadClassName}>
-                    Rank
-                  </TableHead>
-                  <TableHead className={alternativeBoardTableHeadClassName}>
-                    Change
-                  </TableHead>
-                  <TableHead className={alternativeBoardTableHeadClassName}>
-                    Participant
-                  </TableHead>
-                  <TableHead className={alternativeBoardTableHeadClassName}>
-                    Assigned teams
-                  </TableHead>
-                  <TableHead
-                    className={`${alternativeBoardTableHeadClassName} text-right`}
-                  >
-                    Total official score
-                  </TableHead>
-                  <TableHead
-                    className={`${alternativeBoardTableHeadClassName} text-right`}
-                  >
-                    Teams
-                  </TableHead>
-                  <TableHead
-                    className={`${alternativeBoardTableHeadClassName} text-right`}
-                  >
-                    Alternative score
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row, index) => (
-                  <TableRow
-                    key={row.participantId}
-                    className={index === 0 ? "bg-campaign-blush" : undefined}
-                  >
-                    <TableCell>
-                      <div
-                        className={`flex size-11 items-center justify-center rounded-full text-sm font-black text-white ${
-                          index === 0 ? "bg-campaign-magenta" : "bg-campaign-purple"
-                        }`}
-                      >
-                        #{row.rank}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-black text-campaign-purple-strong">
-                      {movementByParticipantId[row.participantId] ?? "-"}
-                    </TableCell>
-                    <TableCell className="font-black text-campaign-ink">
-                      {row.name}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1.5">
-                        {row.teamNames.length > 0 ? (
-                          row.teamNames.map((teamName, teamIndex) => (
-                            <Badge
-                              key={`${row.participantId}-${row.teamIds[teamIndex] ?? teamIndex}`}
-                              className="max-w-full truncate bg-white text-campaign-muted hover:bg-white"
-                            >
-                              {teamName}
-                            </Badge>
-                          ))
-                        ) : (
-                          <CampaignPill tone="soft">No valid teams</CampaignPill>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {row.totalOfficialTeamScore}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {row.assignedTeamCount}
-                    </TableCell>
-                    <TableCell className="text-right text-xl font-black text-campaign-purple-strong">
-                      {row.displayAlternativeScore}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <Tabs defaultValue={initialTab} className="gap-4">
+            <TabsContent value="luck">
+              <StickyBoardControls header={<LuckHeader />} />
+              <LuckOfTheDrawTable
+                boardData={boardData}
+                movementByParticipantId={officialMovementByParticipantId}
+              />
+            </TabsContent>
+            <TabsContent value="fair">
+              <StickyBoardControls header={<FairPlayHeader />} />
+              <FairPlayTable
+                boardData={boardData}
+                movementByParticipantId={alternativeMovementByParticipantId}
+              />
+            </TabsContent>
+            <TabsContent value="teams">
+              <StickyBoardControls header={<TeamsHeader />} />
+              <TeamsTable boardData={boardData} />
+            </TabsContent>
+          </Tabs>
 
           <p className="text-xs font-semibold text-campaign-muted">
             Alternative score = total official score of valid assigned teams
@@ -218,6 +164,397 @@ export function AlternativeBoard({
       </CampaignPageStack>
     </CampaignShell>
   );
+}
+
+function StickyBoardControls({ header }: { header: ReactNode }) {
+  return (
+    <div className={stickyControlClassName} data-testid="sticky-board-controls">
+      <TabsList className="grid h-auto w-full grid-cols-3 rounded-none bg-campaign-lavender/95 p-1">
+        <TabsTrigger
+          value="luck"
+          className={alternativeBoardTabTriggerClassName}
+        >
+          Luck of the Draw
+        </TabsTrigger>
+        <TabsTrigger
+          value="fair"
+          className={alternativeBoardTabTriggerClassName}
+        >
+          Fair Play
+        </TabsTrigger>
+        <TabsTrigger
+          value="teams"
+          className={alternativeBoardTabTriggerClassName}
+        >
+          Teams
+        </TabsTrigger>
+      </TabsList>
+      <div className="overflow-x-auto">{header}</div>
+    </div>
+  );
+}
+
+function LuckHeader() {
+  return (
+    <HeaderGrid className={luckGridClassName}>
+      <HeaderCell>Rank</HeaderCell>
+      <HeaderCell>Change</HeaderCell>
+      <HeaderCell>Participant</HeaderCell>
+      <HeaderCell>Assigned teams</HeaderCell>
+      <HeaderCell align="right">Teams</HeaderCell>
+      <HeaderCell align="right">Total points</HeaderCell>
+    </HeaderGrid>
+  );
+}
+
+function FairPlayHeader() {
+  return (
+    <HeaderGrid className={fairPlayGridClassName}>
+      <HeaderCell>Rank</HeaderCell>
+      <HeaderCell>Change</HeaderCell>
+      <HeaderCell>Participant</HeaderCell>
+      <HeaderCell>Assigned teams</HeaderCell>
+      <HeaderCell align="right">Total points</HeaderCell>
+      <HeaderCell align="right">Teams</HeaderCell>
+      <HeaderCell align="right">Average points</HeaderCell>
+    </HeaderGrid>
+  );
+}
+
+function TeamsHeader() {
+  return (
+    <HeaderGrid className={teamsGridClassName}>
+      <HeaderCell>Rank</HeaderCell>
+      <HeaderCell>Team</HeaderCell>
+      <HeaderCell>Owner</HeaderCell>
+      <HeaderCell align="right">
+        <FootballAbbreviation label="W" description="Wins" />
+      </HeaderCell>
+      <HeaderCell align="right">
+        <FootballAbbreviation label="D" description="Draws" />
+      </HeaderCell>
+      <HeaderCell align="right">
+        <FootballAbbreviation label="L" description="Losses" />
+      </HeaderCell>
+      <HeaderCell align="right">
+        <FootballAbbreviation label="GF" description="Goals For" />
+      </HeaderCell>
+      <HeaderCell align="right">
+        <FootballAbbreviation label="GA" description="Goals Against" />
+      </HeaderCell>
+      <HeaderCell align="right">
+        <FootballAbbreviation label="GD" description="Goal Difference" />
+      </HeaderCell>
+      <HeaderCell align="right">Points</HeaderCell>
+      <HeaderCell>Stage/status</HeaderCell>
+    </HeaderGrid>
+  );
+}
+
+function HeaderGrid({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className: string;
+}) {
+  return (
+    <div className={`${className} border-t border-campaign-lavender`} role="row">
+      {children}
+    </div>
+  );
+}
+
+function HeaderCell({
+  align,
+  children,
+}: {
+  align?: "right";
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`${headerCellClassName} ${
+        align === "right" ? "text-right" : ""
+      }`}
+      role="columnheader"
+    >
+      {children}
+    </div>
+  );
+}
+
+function LuckOfTheDrawTable({
+  boardData,
+  movementByParticipantId,
+}: {
+  boardData: SharedBoardData;
+  movementByParticipantId: Record<string, string>;
+}) {
+  return (
+    <TableFrame>
+      {boardData.standings.map((standing, index) => (
+        <GridRow
+          key={standing.participantId}
+          className={`${luckGridClassName} ${
+            index === 0 ? "bg-campaign-blush" : ""
+          }`}
+        >
+          <RankCell rank={standing.rank} isLeader={index === 0} />
+          <ChangeCell value={movementByParticipantId[standing.participantId]} />
+          <TextCell strong>{standing.name}</TextCell>
+          <TeamsCell
+            participantId={standing.participantId}
+            teamIds={standing.teamIds}
+            teamNames={standing.teamNames}
+          />
+          <NumericCell value={standing.teamCount} />
+          <ScoreCell value={standing.points} />
+        </GridRow>
+      ))}
+    </TableFrame>
+  );
+}
+
+function FairPlayTable({
+  boardData,
+  movementByParticipantId,
+}: {
+  boardData: SharedBoardData;
+  movementByParticipantId: Record<string, string>;
+}) {
+  const rows = buildAlternativeBoardRows(boardData);
+
+  return (
+    <TableFrame>
+      {rows.map((row, index) => (
+        <GridRow
+          key={row.participantId}
+          className={`${fairPlayGridClassName} ${
+            index === 0 ? "bg-campaign-blush" : ""
+          }`}
+        >
+          <RankCell rank={row.rank} isLeader={index === 0} />
+          <ChangeCell value={movementByParticipantId[row.participantId]} />
+          <TextCell strong>{row.name}</TextCell>
+          <TeamsCell
+            participantId={row.participantId}
+            teamIds={row.teamIds}
+            teamNames={row.teamNames}
+          />
+          <NumericCell value={row.totalOfficialTeamScore} />
+          <NumericCell value={row.assignedTeamCount} />
+          <ScoreCell value={row.displayAlternativeScore} />
+        </GridRow>
+      ))}
+    </TableFrame>
+  );
+}
+
+function TeamsTable({ boardData }: { boardData: SharedBoardData }) {
+  const rows = buildAlternativeTeamBoardRows(boardData);
+
+  return (
+    <TableFrame>
+      {rows.map((row, index) => (
+        <GridRow
+          key={row.teamId}
+          className={`${teamsGridClassName} ${
+            index === 0 ? "bg-campaign-blush" : ""
+          }`}
+        >
+          <RankCell centered rank={row.rank} isLeader={index === 0} />
+          <TextCell strong>{row.teamName}</TextCell>
+          <TextCell>{row.ownerName}</TextCell>
+          <NumericCell centered value={row.wins} />
+          <NumericCell centered value={row.draws} />
+          <NumericCell centered value={row.losses} />
+          <NumericCell centered value={row.goalsFor} />
+          <NumericCell centered value={row.goalsAgainst} />
+          <NumericCell centered value={row.goalDifference} />
+          <ScoreCell centered value={row.points} />
+          <TextCell>{formatStatusLabel(row.status)}</TextCell>
+        </GridRow>
+      ))}
+    </TableFrame>
+  );
+}
+
+function TableFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="overflow-x-auto bg-campaign-panel-soft">
+      {children}
+    </div>
+  );
+}
+
+function GridRow({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className: string;
+}) {
+  return (
+    <div
+      className={`${className} border-b border-campaign-ring transition-colors`}
+      role="row"
+    >
+      {children}
+    </div>
+  );
+}
+
+function RankCell({
+  centered = false,
+  isLeader,
+  rank,
+}: {
+  centered?: boolean;
+  isLeader: boolean;
+  rank: number;
+}) {
+  return (
+    <div
+      className={`flex px-2 py-3 ${centered ? "items-center justify-center" : ""}`}
+      role="cell"
+    >
+      <div
+        className={`flex size-11 items-center justify-center rounded-full text-sm font-black text-white ${
+          isLeader ? "bg-campaign-magenta" : "bg-campaign-purple"
+        }`}
+      >
+        #{rank}
+      </div>
+    </div>
+  );
+}
+
+function ChangeCell({ value }: { value?: string }) {
+  return (
+    <div
+      className="px-2 py-3 font-black text-campaign-purple-strong"
+      role="cell"
+    >
+      {value ?? "-"}
+    </div>
+  );
+}
+
+function TeamsCell({
+  participantId,
+  teamIds,
+  teamNames,
+}: {
+  participantId: string;
+  teamIds: string[];
+  teamNames: string[];
+}) {
+  return (
+    <div className="px-2 py-3" role="cell">
+      <div className="flex flex-wrap gap-1.5">
+        {teamNames.length > 0 ? (
+          teamNames.map((teamName, teamIndex) => (
+            <Badge
+              key={`${participantId}-${teamIds[teamIndex] ?? teamIndex}`}
+              className="max-w-full truncate bg-white text-campaign-muted hover:bg-white"
+            >
+              {teamName}
+            </Badge>
+          ))
+        ) : (
+          <CampaignPill tone="soft">No valid teams</CampaignPill>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NumericCell({
+  centered = false,
+  value,
+}: {
+  centered?: boolean;
+  value: number;
+}) {
+  return (
+    <div
+      className={`flex px-2 py-3 font-semibold ${
+        centered ? "items-center justify-center text-center" : "justify-end text-right"
+      }`}
+      role="cell"
+    >
+      {value}
+    </div>
+  );
+}
+
+function ScoreCell({
+  centered = false,
+  value,
+}: {
+  centered?: boolean;
+  value: number | string;
+}) {
+  return (
+    <div
+      className={`flex px-2 py-3 text-xl font-black text-campaign-purple-strong ${
+        centered ? "items-center justify-center text-center" : "justify-end text-right"
+      }`}
+      role="cell"
+    >
+      {value}
+    </div>
+  );
+}
+
+function TextCell({
+  centered = false,
+  children,
+  strong = false,
+}: {
+  centered?: boolean;
+  children: ReactNode;
+  strong?: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-w-0 px-2 py-3 ${
+        centered ? "items-center justify-center text-center" : "items-center"
+      } ${
+        strong ? "font-black text-campaign-ink" : ""
+      }`}
+      role="cell"
+    >
+      <span className="whitespace-normal break-words">{children}</span>
+    </div>
+  );
+}
+
+function FootballAbbreviation({
+  description,
+  label,
+}: {
+  description: string;
+  label: string;
+}) {
+  return (
+    <span
+      aria-label={`${label}: ${description}`}
+      className="cursor-help font-black text-white underline decoration-white/50 decoration-dotted underline-offset-4"
+      role="note"
+      title={`${label} = ${description}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function formatStatusLabel(status: string) {
+  return status
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function HeaderMetric({

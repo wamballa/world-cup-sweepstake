@@ -26,14 +26,20 @@ export default async function AlternativeBoardPage({
     notFound();
   }
 
-  const movementByParticipantId = isPreview
-    ? {}
+  const movement = isPreview
+    ? {
+        officialMovementByParticipantId: {},
+        alternativeMovementByParticipantId: {},
+      }
     : await loadLatestLeaderboardSnapshotMovement(boardData.sweepstakeId);
 
   return (
     <AlternativeBoard
       boardData={boardData}
-      movementByParticipantId={movementByParticipantId}
+      officialMovementByParticipantId={movement.officialMovementByParticipantId}
+      alternativeMovementByParticipantId={
+        movement.alternativeMovementByParticipantId
+      }
     />
   );
 }
