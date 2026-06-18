@@ -30,6 +30,10 @@ import {
   type SharedBoardMatch,
   type SharedBoardStanding,
 } from "@/features/shared-board/shared-board-data";
+import type {
+  LeaderboardMovementDisplay,
+  LeaderboardMovementMap,
+} from "@/server/shared-board/leaderboard-snapshot-movement";
 
 import {
   formatMatchStatus,
@@ -44,6 +48,12 @@ const sharedBoardTableHeadClassName =
   "bg-campaign-muted font-black text-white hover:bg-campaign-muted hover:text-white";
 const sharedBoardGridHeadClassName =
   "bg-campaign-muted px-2 py-2 text-left text-sm font-black text-white";
+const stickyBoardTabsClassName =
+  "sticky top-0 z-40 shadow-sm backdrop-blur";
+const stickyBoardHeaderClassName =
+  "sticky top-11 z-30 shadow-sm";
+const matchesGridClassName =
+  "grid w-full min-w-0 grid-cols-[minmax(0,1.35fr)_minmax(0,1.6fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(7rem,0.8fr)_minmax(4rem,0.45fr)]";
 
 export type SharedScoreboardExtraTab = {
   value: string;
@@ -61,7 +71,9 @@ export function SharedScoreboard({
   badgesContent,
   explainerContent,
   heroLeaderLabel,
+  officialMovementByParticipantId,
   showParticipantsHeader = false,
+  stickyBoardControls = false,
   teamsContent,
 }: {
   selectedParticipantId?: string | null;
@@ -72,7 +84,9 @@ export function SharedScoreboard({
   badgesContent?: ReactNode;
   explainerContent?: ReactNode;
   heroLeaderLabel?: string;
+  officialMovementByParticipantId?: LeaderboardMovementMap;
   showParticipantsHeader?: boolean;
+  stickyBoardControls?: boolean;
   teamsContent?: ReactNode;
 }) {
   const standings = boardData.standings;
@@ -116,9 +130,15 @@ export function SharedScoreboard({
       </CampaignPanel>
 
       <CampaignPanel className="p-3 sm:p-4">
-        <Tabs defaultValue={defaultTab} className="gap-4">
+        <Tabs
+          defaultValue={defaultTab}
+          className={stickyBoardControls ? "gap-0" : "gap-4"}
+        >
           <TabsList
-            className="grid h-auto w-full rounded-2xl bg-campaign-lavender/40 p-1"
+            className={`grid h-auto w-full rounded-2xl bg-campaign-lavender/40 p-1 ${
+              stickyBoardControls ? stickyBoardTabsClassName : ""
+            }`}
+            data-testid="shared-scoreboard-tabs"
             style={{
               gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))`,
             }}
@@ -163,11 +183,16 @@ export function SharedScoreboard({
             />
           </TabsList>
 
-          <TabsContent value="participants">
+          <TabsContent
+            value="participants"
+            className={stickyBoardControls ? "pt-3" : undefined}
+          >
             <ParticipantsPanel
               selectedParticipantId={selectedParticipantId}
               boardData={boardData}
+              officialMovementByParticipantId={officialMovementByParticipantId}
               showHeader={showParticipantsHeader}
+              stickyHeader={stickyBoardControls}
             />
           </TabsContent>
           {extraTabsAfterParticipants.map((tab) => (
@@ -175,10 +200,16 @@ export function SharedScoreboard({
               {tab.content}
             </TabsContent>
           ))}
-          <TabsContent value="teams">
+          <TabsContent
+            value="teams"
+            className={stickyBoardControls ? "pt-3" : undefined}
+          >
             {teamsContent ?? <TeamsPanel boardData={boardData} />}
           </TabsContent>
-          <TabsContent value="badges">
+          <TabsContent
+            value="badges"
+            className={stickyBoardControls ? "pt-3" : undefined}
+          >
             {badgesContent ?? (
               <BadgesPanel
                 badges={boardData.badges}
@@ -187,8 +218,14 @@ export function SharedScoreboard({
               />
             )}
           </TabsContent>
-          <TabsContent value="matches">
-            <MatchesPanel matches={boardData.matches} />
+          <TabsContent
+            value="matches"
+            className={stickyBoardControls ? "pt-3" : undefined}
+          >
+            <MatchesPanel
+              matches={boardData.matches}
+              stickyHeader={stickyBoardControls}
+            />
           </TabsContent>
           <TabsContent value="stats">
             <StatsPanel
@@ -293,11 +330,15 @@ function HeroSummaryMetric({ label, value }: { label: string; value: string }) {
 function ParticipantsPanel({
   selectedParticipantId,
   boardData,
+  officialMovementByParticipantId,
   showHeader = false,
+  stickyHeader = false,
 }: {
   selectedParticipantId?: string | null;
   boardData: SharedBoardData;
+  officialMovementByParticipantId?: LeaderboardMovementMap;
   showHeader?: boolean;
+  stickyHeader?: boolean;
 }) {
   const standings = boardData.standings;
   const featuredParticipant = standings.find(
@@ -307,14 +348,22 @@ function ParticipantsPanel({
   if (showHeader) {
     return (
       <div
-        className="overflow-hidden rounded-2xl bg-campaign-panel-soft"
+        className={`rounded-2xl bg-campaign-panel-soft ${
+          stickyHeader ? "overflow-visible" : "overflow-hidden"
+        }`}
         data-testid="participants-table-frame"
       >
-        <ParticipantsHeader />
+        <ParticipantsHeader
+          showChange={officialMovementByParticipantId !== undefined}
+          sticky={stickyHeader}
+        />
         {standings.map((standing, index) => (
           <ParticipantStandingRow
             key={standing.participantId}
+            change={officialMovementByParticipantId?.[standing.participantId]}
+            showChange={officialMovementByParticipantId !== undefined}
             index={index}
+            tableLayout
             standing={standing}
           />
         ))}
@@ -328,6 +377,8 @@ function ParticipantsPanel({
         {standings.map((standing, index) => (
           <ParticipantStandingRow
             key={standing.participantId}
+            change={officialMovementByParticipantId?.[standing.participantId]}
+            showChange={officialMovementByParticipantId !== undefined}
             index={index}
             standing={standing}
           />
@@ -380,12 +431,59 @@ function ParticipantsPanel({
 }
 
 function ParticipantStandingRow({
+  change,
   index,
+  showChange,
   standing,
+  tableLayout = false,
 }: {
+  change?: LeaderboardMovementDisplay;
   index: number;
+  showChange: boolean;
   standing: SharedBoardStanding;
+  tableLayout?: boolean;
 }) {
+  if (tableLayout) {
+    return (
+      <motion.div
+        className={`grid ${
+          showChange
+            ? "grid-cols-[3.25rem_minmax(0,1fr)_4.25rem_3rem] sm:grid-cols-[5rem_minmax(0,1fr)_8rem_6rem]"
+            : "grid-cols-[3.25rem_minmax(0,1fr)_4.25rem] sm:grid-cols-[5rem_minmax(0,1fr)_8rem]"
+        } ${
+          index === 0 ? "bg-campaign-blush" : "bg-campaign-page"
+        } ${index > 0 ? "border-t border-campaign-ring" : ""}`}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        role="row"
+        transition={{ delay: index * 0.025 }}
+      >
+        <div className="flex items-center px-1.5 py-3 sm:px-2" role="cell">
+          <RankBadge compact index={index} rank={standing.rank} />
+        </div>
+        <div className="flex min-w-0 items-center px-1.5 py-3 sm:px-2" role="cell">
+          <ParticipantSummary standing={standing} />
+        </div>
+        <div className="px-1.5 py-3 text-right sm:px-2" role="cell">
+          <p className="text-xl font-black text-campaign-purple-strong sm:text-2xl">
+            {standing.points}
+          </p>
+          <p className="text-[0.65rem] font-semibold leading-tight text-campaign-muted sm:text-xs">
+            {standing.teamCount} teams
+          </p>
+        </div>
+        {showChange ? (
+          <div
+            className="flex items-center justify-end px-2 py-3 text-right text-sm font-black text-campaign-magenta"
+            role="cell"
+          >
+            {change ?? "-"}
+          </div>
+        ) : null}
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       className={`p-3 ${
@@ -397,28 +495,8 @@ function ParticipantStandingRow({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div
-            className={`flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
-              index === 0 ? "bg-campaign-magenta" : "bg-campaign-purple"
-            }`}
-          >
-            #{standing.rank}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate font-black text-campaign-ink">
-              {standing.name}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {standing.teamNames.map((teamName, teamIndex) => (
-                <Badge
-                  key={`${standing.participantId}-${standing.teamIds[teamIndex] ?? teamIndex}`}
-                  className="max-w-full truncate bg-white text-campaign-muted hover:bg-white"
-                >
-                  {teamName}
-                </Badge>
-              ))}
-            </div>
-          </div>
+          <RankBadge index={index} rank={standing.rank} />
+          <ParticipantSummary standing={standing} />
         </div>
         <div className="text-right">
           <p className="text-2xl font-black text-campaign-purple-strong">
@@ -427,30 +505,104 @@ function ParticipantStandingRow({
           <p className="text-xs font-semibold text-campaign-muted">
             {standing.teamCount} teams
           </p>
+          {showChange ? (
+            <p className="mt-1 text-xs font-black text-campaign-magenta">
+              Change {change ?? "-"}
+            </p>
+          ) : null}
         </div>
       </div>
     </motion.div>
   );
 }
 
-function ParticipantsHeader() {
+function RankBadge({
+  compact = false,
+  index,
+  rank,
+}: {
+  compact?: boolean;
+  index: number;
+  rank: number;
+}) {
   return (
     <div
-      className="grid grid-cols-[5rem_minmax(0,1fr)_8rem] overflow-hidden rounded-t-2xl"
+      className={`flex shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
+        compact ? "size-9 sm:size-11" : "size-11"
+      } ${
+        index === 0 ? "bg-campaign-magenta" : "bg-campaign-purple"
+      }`}
+    >
+      #{rank}
+    </div>
+  );
+}
+
+function ParticipantSummary({ standing }: { standing: SharedBoardStanding }) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate font-black text-campaign-ink">{standing.name}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {standing.teamNames.map((teamName, teamIndex) => (
+          <Badge
+            key={`${standing.participantId}-${standing.teamIds[teamIndex] ?? teamIndex}`}
+            className="max-w-full truncate bg-white text-campaign-muted hover:bg-white"
+          >
+            {teamName}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ParticipantsHeader({
+  showChange,
+  sticky,
+}: {
+  showChange: boolean;
+  sticky: boolean;
+}) {
+  return (
+    <div
+      className={`grid ${
+        showChange
+          ? "grid-cols-[3.25rem_minmax(0,1fr)_4.25rem_3rem] sm:grid-cols-[5rem_minmax(0,1fr)_8rem_6rem]"
+          : "grid-cols-[3.25rem_minmax(0,1fr)_4.25rem] sm:grid-cols-[5rem_minmax(0,1fr)_8rem]"
+      } overflow-hidden rounded-t-2xl ${
+        sticky ? stickyBoardHeaderClassName : ""
+      }`}
+      data-testid="participants-column-header"
       role="row"
     >
-      <div className={sharedBoardGridHeadClassName} role="columnheader">
+      <div
+        aria-label="Rank"
+        className={sharedBoardGridHeadClassName}
+        role="columnheader"
+      >
         Rank
       </div>
       <div className={sharedBoardGridHeadClassName} role="columnheader">
         Participant
       </div>
       <div
+        aria-label="Total points"
         className={`${sharedBoardGridHeadClassName} text-right`}
         role="columnheader"
       >
-        Total points
+        <span className="sm:hidden">Pts</span>
+        <span className="hidden sm:inline">Total points</span>
       </div>
+      {showChange ? (
+        <div
+          aria-label="Change"
+          className={`${sharedBoardGridHeadClassName} text-right`}
+          role="columnheader"
+        >
+          <span className="sm:hidden">Chg</span>
+          <span className="hidden sm:inline">Change</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -720,65 +872,228 @@ function BadgesPanel({
   );
 }
 
-function MatchesPanel({ matches }: { matches: SharedBoardMatch[] }) {
+function MatchesPanel({
+  matches,
+  stickyHeader = false,
+}: {
+  matches: SharedBoardMatch[];
+  stickyHeader?: boolean;
+}) {
+  if (stickyHeader) {
+    return (
+      <div className="rounded-2xl bg-campaign-panel-soft">
+        <div className="grid gap-3 p-3 md:hidden" data-testid="matches-mobile-list">
+          {matches.map((match) => (
+            <MobileMatchCard key={match.id} match={match} />
+          ))}
+        </div>
+        <div className="hidden md:block">
+          <MatchesHeader sticky />
+          <div data-testid="matches-row-scroll">
+            {matches.map((match) => (
+              <MatchGridRow key={match.id} match={match} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl bg-campaign-panel-soft">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className={sharedBoardTableHeadClassName}>
-              Match
-            </TableHead>
-            <TableHead className={sharedBoardTableHeadClassName}>
-              Participants
-            </TableHead>
-            <TableHead
-              className={`${sharedBoardTableHeadClassName} hidden sm:table-cell`}
-            >
-              Stage
-            </TableHead>
-            <TableHead
-              className={`${sharedBoardTableHeadClassName} hidden md:table-cell`}
-            >
-              Kickoff
-            </TableHead>
-            <TableHead className={sharedBoardTableHeadClassName}>
-              Status
-            </TableHead>
-            <TableHead
-              className={`${sharedBoardTableHeadClassName} text-right`}
-            >
-              Score
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {matches.map((match) => (
-            <TableRow key={match.id}>
-              <TableCell className="font-medium">
-                {match.homeTeamName} v {match.awayTeamName}
-              </TableCell>
-              <TableCell>{match.participantLabel}</TableCell>
-              <TableCell className="hidden sm:table-cell">
-                {match.stage}
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                {match.kickoffLabel}
-              </TableCell>
-              <TableCell>
-                <Badge
-                  variant={match.status === "delayed" ? "outline" : "secondary"}
-                >
-                  {formatMatchStatus(match.status)}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right font-mono font-semibold">
-                {match.homeScore ?? "-"}:{match.awayScore ?? "-"}
-              </TableCell>
+      <div className="grid gap-3 p-3 md:hidden" data-testid="matches-mobile-list">
+        {matches.map((match) => (
+          <MobileMatchCard key={match.id} match={match} />
+        ))}
+      </div>
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className={sharedBoardTableHeadClassName}>
+                Match
+              </TableHead>
+              <TableHead className={sharedBoardTableHeadClassName}>
+                Participants
+              </TableHead>
+              <TableHead
+                className={`${sharedBoardTableHeadClassName} hidden sm:table-cell`}
+              >
+                Stage
+              </TableHead>
+              <TableHead
+                className={`${sharedBoardTableHeadClassName} hidden md:table-cell`}
+              >
+                Kickoff
+              </TableHead>
+              <TableHead className={sharedBoardTableHeadClassName}>
+                Status
+              </TableHead>
+              <TableHead
+                className={`${sharedBoardTableHeadClassName} text-right`}
+              >
+                Score
+              </TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {matches.map((match) => (
+              <TableRow key={match.id}>
+                <TableCell className="font-medium">
+                  {match.homeTeamName} v {match.awayTeamName}
+                </TableCell>
+                <TableCell>{match.participantLabel}</TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  {match.stage}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {match.kickoffLabel}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      match.status === "delayed" ? "outline" : "secondary"
+                    }
+                  >
+                    {formatMatchStatus(match.status)}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-mono font-semibold">
+                  {match.homeScore ?? "-"}:{match.awayScore ?? "-"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function MatchesHeader({ sticky = false }: { sticky?: boolean }) {
+  return (
+    <div
+      className={`${matchesGridClassName} overflow-hidden rounded-t-2xl ${
+        sticky ? stickyBoardHeaderClassName : ""
+      }`}
+      data-testid="matches-column-header"
+      role="row"
+    >
+      <div className={sharedBoardGridHeadClassName} role="columnheader">
+        Match
+      </div>
+      <div className={sharedBoardGridHeadClassName} role="columnheader">
+        Participants
+      </div>
+      <div className={sharedBoardGridHeadClassName} role="columnheader">
+        Stage
+      </div>
+      <div className={sharedBoardGridHeadClassName} role="columnheader">
+        Kickoff
+      </div>
+      <div className={sharedBoardGridHeadClassName} role="columnheader">
+        Status
+      </div>
+      <div
+        className={`${sharedBoardGridHeadClassName} text-right`}
+        role="columnheader"
+      >
+        Score
+      </div>
+    </div>
+  );
+}
+
+function MatchGridRow({ match }: { match: SharedBoardMatch }) {
+  return (
+    <div
+      className={`${matchesGridClassName} border-b border-campaign-ring transition-colors`}
+      role="row"
+    >
+      <div className="flex min-w-0 items-center px-2 py-2 font-medium" role="cell">
+        <span className="whitespace-normal break-words">
+          {match.homeTeamName} v {match.awayTeamName}
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center px-2 py-2" role="cell">
+        <span className="whitespace-normal break-words">
+          {match.participantLabel}
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center px-2 py-2" role="cell">
+        <span className="whitespace-normal break-words">{match.stage}</span>
+      </div>
+      <div className="flex min-w-0 items-center px-2 py-2" role="cell">
+        <span className="whitespace-normal break-words">
+          {match.kickoffLabel}
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center px-2 py-2" role="cell">
+        <Badge variant={match.status === "delayed" ? "outline" : "secondary"}>
+          {formatMatchStatus(match.status)}
+        </Badge>
+      </div>
+      <div
+        className="flex items-center justify-end px-2 py-2 text-right font-mono font-semibold"
+        role="cell"
+      >
+        {match.homeScore ?? "-"}:{match.awayScore ?? "-"}
+      </div>
+    </div>
+  );
+}
+
+function MobileMatchCard({ match }: { match: SharedBoardMatch }) {
+  return (
+    <article className="rounded-2xl bg-campaign-page p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="break-words font-black leading-tight text-campaign-ink">
+            {match.homeTeamName} v {match.awayTeamName}
+          </h3>
+          <p className="mt-1 break-words text-xs font-semibold text-campaign-muted">
+            {match.participantLabel}
+          </p>
+        </div>
+        <div className="shrink-0 text-right font-mono text-lg font-black text-campaign-purple-strong">
+          {match.homeScore ?? "-"}:{match.awayScore ?? "-"}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2">
+        <MobileMatchDetail label="Stage" value={match.stage} />
+        <MobileMatchDetail label="Kickoff" value={match.kickoffLabel} />
+        <div className="rounded-xl bg-white px-3 py-2">
+          <p className="text-xs font-black uppercase text-campaign-magenta">
+            Status
+          </p>
+          <Badge
+            className="mt-1"
+            variant={match.status === "delayed" ? "outline" : "secondary"}
+          >
+            {formatMatchStatus(match.status)}
+          </Badge>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function MobileMatchDetail({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl bg-white px-3 py-2">
+      <p className="text-xs font-black uppercase text-campaign-magenta">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-semibold text-campaign-ink">
+        {value}
+      </p>
     </div>
   );
 }

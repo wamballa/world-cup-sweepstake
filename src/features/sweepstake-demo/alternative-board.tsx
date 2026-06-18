@@ -18,21 +18,25 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  type AlternativeTeamBoardRow,
   buildAlternativeBadgeRows,
   buildAlternativeTeamBoardRows,
 } from "@/features/shared-board/alternative-board-data";
 import type { SharedBoardData } from "@/features/shared-board/shared-board-data";
+import type { LeaderboardMovementMap } from "@/server/shared-board/leaderboard-snapshot-movement";
 
 import { SharedScoreboard } from "./shared-scoreboard";
 
 const headerCellClassName =
-  "bg-campaign-muted px-2 py-2 text-left text-sm font-black text-white";
+  "min-w-0 bg-campaign-muted px-1 py-2 text-left text-xs font-black text-white lg:px-2 lg:text-sm";
+const stickyColumnHeaderClassName = "sticky top-11 z-30 shadow-sm";
 const teamsGridClassName =
-  "grid min-w-[70rem] grid-cols-[5rem_minmax(11rem,1fr)_minmax(12rem,1fr)_3rem_3rem_3rem_4rem_4rem_4rem_5rem_5rem_minmax(18rem,2fr)]";
+  "grid w-full min-w-0 grid-cols-[3.25rem_minmax(0,1.15fr)_minmax(0,1fr)_2rem_2rem_2rem_2.5rem_2.5rem_2.5rem_3.75rem_minmax(0,0.8fr)_minmax(0,1.5fr)] lg:grid-cols-[4rem_minmax(0,1.2fr)_minmax(0,1fr)_2.5rem_2.5rem_2.5rem_3rem_3rem_3rem_4.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)]";
 
 export function AlternativeBoard({
   boardData,
   initialTab = "participants",
+  officialMovementByParticipantId,
 }: {
   boardData: SharedBoardData;
   initialTab?:
@@ -42,6 +46,7 @@ export function AlternativeBoard({
     | "matches"
     | "stats"
     | "explainer";
+  officialMovementByParticipantId?: LeaderboardMovementMap;
 }) {
   const leadingParticipant = boardData.standings[0];
   const leadingTeamRow = buildAlternativeTeamBoardRows(boardData)[0];
@@ -50,7 +55,7 @@ export function AlternativeBoard({
     : undefined;
 
   return (
-    <CampaignShell className="overflow-x-visible">
+    <CampaignShell className="overflow-x-clip">
       <CampaignPageStack>
         <CampaignHeader
           logo={
@@ -90,7 +95,9 @@ export function AlternativeBoard({
           boardData={boardData}
           defaultTab={initialTab}
           leadingParticipant={leadingParticipant}
+          officialMovementByParticipantId={officialMovementByParticipantId}
           showParticipantsHeader
+          stickyBoardControls
           badgesContent={<AlternativeBadgesPanel boardData={boardData} />}
           explainerContent={<AlternativeExplainerPanel />}
           heroLeaderLabel={heroLeaderLabel}
@@ -118,13 +125,12 @@ function formatHeaderFreshnessLabel(freshnessLabel: string) {
 }
 
 const alternativeScoringRows = [
-  ["Group win", "3 pts"],
-  ["Group draw", "1 pt"],
-  ["Reach Round of 16", "+5 pts"],
-  ["Reach quarter-final", "+8 pts"],
-  ["Reach semi-final", "+12 pts"],
-  ["Runner-up", "+15 pts"],
-  ["Win the World Cup", "+25 pts"],
+  ["Group only", "group points (Win = 3, Draw = 1, Loss = 0)"],
+  ["Reach Round of 16", "group points + 5"],
+  ["Reach quarter-final", "group points + 8"],
+  ["Reach semi-final", "group points + 12"],
+  ["Runner-up", "group points + 15"],
+  ["Winner", "group points + 25"],
 ] as const;
 
 function AlternativeExplainerPanel() {
@@ -136,8 +142,8 @@ function AlternativeExplainerPanel() {
         </p>
         <h3 className="mt-1 text-2xl font-black">How scoring works</h3>
         <p className="mt-1 text-sm font-semibold text-white/85">
-          Each team earns points from results and tournament progress. Your
-          place on the board depends on how your allocated team performs.
+          Each team gets group points, plus one stage bonus based on the
+          furthest stage reached.
         </p>
       </div>
 
@@ -150,7 +156,7 @@ function AlternativeExplainerPanel() {
             <span className="text-sm font-semibold text-campaign-muted">
               {label}
             </span>
-            <span className="shrink-0 font-black text-campaign-purple-strong">
+            <span className="min-w-0 break-words text-right font-black text-campaign-purple-strong">
               {points}
             </span>
           </div>
@@ -158,6 +164,9 @@ function AlternativeExplainerPanel() {
       </div>
 
       <div className="space-y-3 bg-campaign-yellow/35 px-4 py-5 sm:px-6">
+        <p className="text-sm font-semibold text-campaign-ink">
+          Stage bonuses are not cumulative.
+        </p>
         <p className="text-sm font-semibold text-campaign-ink">
           The Teams tab shows every allocated team separately, with its owner,
           wins, draws, losses, goals for, goals against, goal difference,
@@ -221,34 +230,39 @@ function AlternativeBadgesPanel({ boardData }: { boardData: SharedBoardData }) {
   );
 }
 
-function TeamsHeader() {
+function TeamsHeader({ sticky = false }: { sticky?: boolean }) {
   return (
-    <HeaderGrid className={teamsGridClassName}>
-      <HeaderCell>Rank</HeaderCell>
-      <HeaderCell>Team</HeaderCell>
-      <HeaderCell>Owner</HeaderCell>
-      <HeaderCell align="right">
-        <FootballAbbreviation label="W" description="Wins" />
-      </HeaderCell>
-      <HeaderCell align="right">
-        <FootballAbbreviation label="D" description="Draws" />
-      </HeaderCell>
-      <HeaderCell align="right">
-        <FootballAbbreviation label="L" description="Losses" />
-      </HeaderCell>
-      <HeaderCell align="right">
-        <FootballAbbreviation label="GF" description="Goals For" />
-      </HeaderCell>
-      <HeaderCell align="right">
-        <FootballAbbreviation label="GA" description="Goals Against" />
-      </HeaderCell>
-      <HeaderCell align="right">
-        <FootballAbbreviation label="GD" description="Goal Difference" />
-      </HeaderCell>
-      <HeaderCell align="right">Points</HeaderCell>
-      <HeaderCell>Stage</HeaderCell>
-      <HeaderCell>Next fixture</HeaderCell>
-    </HeaderGrid>
+    <div
+      className={`hidden md:block ${sticky ? stickyColumnHeaderClassName : ""}`}
+      data-testid="teams-column-header"
+    >
+      <HeaderGrid className={teamsGridClassName}>
+        <HeaderCell>Rank</HeaderCell>
+        <HeaderCell>Team</HeaderCell>
+        <HeaderCell>Owner</HeaderCell>
+        <HeaderCell align="right">
+          <FootballAbbreviation label="W" description="Wins" />
+        </HeaderCell>
+        <HeaderCell align="right">
+          <FootballAbbreviation label="D" description="Draws" />
+        </HeaderCell>
+        <HeaderCell align="right">
+          <FootballAbbreviation label="L" description="Losses" />
+        </HeaderCell>
+        <HeaderCell align="right">
+          <FootballAbbreviation label="GF" description="Goals For" />
+        </HeaderCell>
+        <HeaderCell align="right">
+          <FootballAbbreviation label="GA" description="Goals Against" />
+        </HeaderCell>
+        <HeaderCell align="right">
+          <FootballAbbreviation label="GD" description="Goal Difference" />
+        </HeaderCell>
+        <HeaderCell align="right">Points</HeaderCell>
+        <HeaderCell>Stage</HeaderCell>
+        <HeaderCell>Next fixture</HeaderCell>
+      </HeaderGrid>
+    </div>
   );
 }
 
@@ -260,7 +274,10 @@ function HeaderGrid({
   className: string;
 }) {
   return (
-    <div className={`${className} border-t border-campaign-lavender`} role="row">
+    <div
+      className={`${className} border-t border-campaign-lavender`}
+      role="row"
+    >
       {children}
     </div>
   );
@@ -290,35 +307,141 @@ function TeamsTable({ boardData }: { boardData: SharedBoardData }) {
 
   return (
     <TableFrame>
-      <TeamsHeader />
-      {rows.map((row, index) => (
-        <GridRow
-          key={row.teamId}
-          className={`${teamsGridClassName} ${
-            index === 0 ? "bg-campaign-blush" : ""
+      <div className="grid gap-3 md:hidden" data-testid="teams-mobile-list">
+        {rows.map((row, index) => (
+          <MobileTeamCard
+            key={row.teamId}
+            isLeader={index === 0}
+            row={row}
+          />
+        ))}
+      </div>
+      <TeamsHeader sticky />
+      <div
+        className="hidden md:block"
+        data-testid="teams-row-scroll"
+      >
+        {rows.map((row, index) => (
+          <GridRow
+            key={row.teamId}
+            className={`${teamsGridClassName} ${
+              index === 0 ? "bg-campaign-blush" : ""
+            }`}
+          >
+            <RankCell centered rank={row.rank} isLeader={index === 0} />
+            <TextCell strong>{row.teamName}</TextCell>
+            <TextCell>{row.ownerName}</TextCell>
+            <NumericCell centered value={row.wins} />
+            <NumericCell centered value={row.draws} />
+            <NumericCell centered value={row.losses} />
+            <NumericCell centered value={row.goalsFor} />
+            <NumericCell centered value={row.goalsAgainst} />
+            <NumericCell centered value={row.goalDifference} />
+            <ScoreCell centered value={row.points} />
+            <TextCell>{formatStatusLabel(row.status)}</TextCell>
+            <TextCell>{row.nextFixture}</TextCell>
+          </GridRow>
+        ))}
+      </div>
+    </TableFrame>
+  );
+}
+
+function MobileTeamCard({
+  isLeader,
+  row,
+}: {
+  isLeader: boolean;
+  row: AlternativeTeamBoardRow;
+}) {
+  return (
+    <article
+      className={`rounded-2xl p-3 ${
+        isLeader ? "bg-campaign-blush" : "bg-campaign-page"
+      }`}
+    >
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
+        <div
+          className={`flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
+            isLeader ? "bg-campaign-magenta" : "bg-campaign-purple"
           }`}
         >
-          <RankCell centered rank={row.rank} isLeader={index === 0} />
-          <TextCell strong>{row.teamName}</TextCell>
-          <TextCell>{row.ownerName}</TextCell>
-          <NumericCell centered value={row.wins} />
-          <NumericCell centered value={row.draws} />
-          <NumericCell centered value={row.losses} />
-          <NumericCell centered value={row.goalsFor} />
-          <NumericCell centered value={row.goalsAgainst} />
-          <NumericCell centered value={row.goalDifference} />
-          <ScoreCell centered value={row.points} />
-          <TextCell>{formatStatusLabel(row.status)}</TextCell>
-          <TextCell>{row.nextFixture}</TextCell>
-        </GridRow>
-      ))}
-    </TableFrame>
+          #{row.rank}
+        </div>
+        <div className="min-w-0">
+          <h3 className="break-words font-black leading-tight text-campaign-ink">
+            {row.teamName}
+          </h3>
+          <p className="mt-1 break-words text-xs font-semibold text-campaign-muted">
+            {row.ownerName}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-black leading-none text-campaign-purple-strong">
+            {row.points}
+          </p>
+          <p className="mt-1 text-xs font-black uppercase text-campaign-magenta">
+            Pts
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <MobileTeamMetric label="W" value={row.wins} />
+        <MobileTeamMetric label="D" value={row.draws} />
+        <MobileTeamMetric label="L" value={row.losses} />
+        <MobileTeamMetric label="GF" value={row.goalsFor} />
+        <MobileTeamMetric label="GA" value={row.goalsAgainst} />
+        <MobileTeamMetric label="GD" value={row.goalDifference} />
+      </div>
+
+      <div className="mt-3 grid gap-2">
+        <MobileTeamDetail label="Stage" value={formatStatusLabel(row.status)} />
+        <MobileTeamDetail label="Next fixture" value={row.nextFixture} />
+      </div>
+    </article>
+  );
+}
+
+function MobileTeamMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-xl bg-white px-3 py-2 text-center">
+      <p className="text-xs font-black uppercase text-campaign-magenta">
+        {label}
+      </p>
+      <p className="mt-1 font-black text-campaign-purple-strong">{value}</p>
+    </div>
+  );
+}
+
+function MobileTeamDetail({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl bg-white px-3 py-2">
+      <p className="text-xs font-black uppercase text-campaign-magenta">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-semibold text-campaign-ink">
+        {value}
+      </p>
+    </div>
   );
 }
 
 function TableFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-2xl bg-campaign-panel-soft">
+    <div className="overflow-visible rounded-2xl bg-campaign-panel-soft">
       {children}
     </div>
   );

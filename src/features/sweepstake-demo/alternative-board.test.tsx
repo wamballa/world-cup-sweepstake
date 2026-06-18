@@ -77,6 +77,82 @@ describe("AlternativeBoard", () => {
     expect(within(participantsFrame).getByText("Jobin")).toBeInTheDocument();
   });
 
+  it("makes hidden board tabs and Participants headers sticky", () => {
+    renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
+
+    expect(screen.getByTestId("shared-scoreboard-tabs")).toHaveClass(
+      "sticky",
+      "top-0",
+    );
+    expect(screen.getByTestId("participants-column-header")).toHaveClass(
+      "sticky",
+      "top-11",
+    );
+  });
+
+  it("makes hidden board Teams and Matches headers sticky", () => {
+    renderAlternativeBoard(
+      <AlternativeBoard boardData={boardData()} initialTab="teams" />,
+    );
+
+    expect(screen.getByTestId("teams-column-header")).toHaveClass(
+      "sticky",
+      "top-11",
+    );
+    expect(screen.getByTestId("teams-row-scroll")).not.toContainElement(
+      screen.getByTestId("teams-column-header"),
+    );
+
+    renderAlternativeBoard(
+      <AlternativeBoard boardData={boardData()} initialTab="matches" />,
+    );
+
+    expect(screen.getByTestId("matches-column-header")).toHaveClass(
+      "sticky",
+      "top-11",
+    );
+    expect(screen.getByTestId("matches-row-scroll")).not.toContainElement(
+      screen.getByTestId("matches-column-header"),
+    );
+  });
+
+  it("renders participant rank movement on the hidden board when provided", () => {
+    renderAlternativeBoard(
+      <AlternativeBoard
+        boardData={boardData()}
+        officialMovementByParticipantId={{
+          jobin: "+1",
+        }}
+      />,
+    );
+
+    const participantsFrame = screen.getByTestId("participants-table-frame");
+
+    expect(
+      within(participantsFrame).getByRole("columnheader", { name: "Change" }),
+    ).toBeInTheDocument();
+    expect(within(participantsFrame).getByText("Pts")).toBeInTheDocument();
+    expect(within(participantsFrame).getByText("Chg")).toBeInTheDocument();
+    expect(within(participantsFrame).getByText("+1")).toBeInTheDocument();
+    expect(within(participantsFrame).getAllByText("-").length).toBeGreaterThan(0);
+
+    const jobinRow = within(participantsFrame)
+      .getByText("Jobin")
+      .closest('[role="row"]');
+
+    expect(jobinRow).not.toBeNull();
+    expect(within(jobinRow as HTMLElement).getByText("83")).toBeInTheDocument();
+    expect(
+      within(jobinRow as HTMLElement).getByText("2 teams"),
+    ).toBeInTheDocument();
+    expect(
+      within(jobinRow as HTMLElement).getByText("+1"),
+    ).toBeInTheDocument();
+    expect(
+      within(jobinRow as HTMLElement).queryByText("Change +1"),
+    ).not.toBeInTheDocument();
+  });
+
   it("removes participant sidebar cards from the hidden board", () => {
     renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
 
@@ -106,12 +182,12 @@ describe("AlternativeBoard", () => {
       <AlternativeBoard boardData={boardData()} initialTab="teams" />,
     );
 
-    expect(screen.getByText("W")).toBeInTheDocument();
-    expect(screen.getByText("D")).toBeInTheDocument();
-    expect(screen.getByText("L")).toBeInTheDocument();
-    expect(screen.getByText("GF")).toBeInTheDocument();
-    expect(screen.getByText("GA")).toBeInTheDocument();
-    expect(screen.getByText("GD")).toBeInTheDocument();
+    expect(screen.getAllByText("W").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("D").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("L").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GF").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GA").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GD").length).toBeGreaterThan(0);
     const winsHelp = screen.getByRole("button", { name: "W: Wins" });
 
     expect(winsHelp).toHaveAttribute(
@@ -132,9 +208,26 @@ describe("AlternativeBoard", () => {
     expect(
       screen.queryByRole("columnheader", { name: "Stage/status" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Japan")).toBeInTheDocument();
+    expect(screen.getAllByText("Japan").length).toBeGreaterThan(0);
     expect(
       screen.getAllByText("v Scotland (20 Jun 2026, 20:00)").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("renders mobile cards for hidden board Teams", () => {
+    renderAlternativeBoard(
+      <AlternativeBoard boardData={boardData()} initialTab="teams" />,
+    );
+
+    const mobileList = screen.getByTestId("teams-mobile-list");
+
+    expect(within(mobileList).getByText("#1")).toBeInTheDocument();
+    expect(within(mobileList).getByText("Japan")).toBeInTheDocument();
+    expect(within(mobileList).getByText("Andy")).toBeInTheDocument();
+    expect(within(mobileList).getAllByText("Pts").length).toBeGreaterThan(0);
+    expect(within(mobileList).getAllByText("Stage").length).toBeGreaterThan(0);
+    expect(
+      within(mobileList).getAllByText("Next fixture").length,
     ).toBeGreaterThan(0);
   });
 
@@ -152,7 +245,8 @@ describe("AlternativeBoard", () => {
       <AlternativeBoard boardData={boardData()} initialTab="matches" />,
     );
 
-    expect(screen.getByText("Japan v Norway")).toBeInTheDocument();
+    expect(screen.getAllByText("Japan v Norway").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("matches-mobile-list")).toBeInTheDocument();
 
     renderAlternativeBoard(
       <AlternativeBoard boardData={boardData()} initialTab="stats" />,
@@ -174,9 +268,10 @@ describe("AlternativeBoard", () => {
 
     expect(
       screen.getByText(
-        "Each team earns points from results and tournament progress. Your place on the board depends on how your allocated team performs.",
+        "Each team gets group points, plus one stage bonus based on the furthest stage reached.",
       ),
     ).toBeInTheDocument();
+    expect(screen.getByText("Stage bonuses are not cumulative.")).toBeInTheDocument();
     expect(
       screen.getByText(
         "The Teams tab shows every allocated team separately, with its owner, wins, draws, losses, goals for, goals against, goal difference, points, status and next fixture.",
@@ -248,14 +343,24 @@ describe("AlternativeBoard", () => {
 
     expect(screen.getByText("Choose your name")).toBeInTheDocument();
     expect(screen.getByText("Email optional")).toBeInTheDocument();
+    expect(screen.getByTestId("shared-scoreboard-tabs")).not.toHaveClass(
+      "sticky",
+    );
+    expect(
+      screen.queryByRole("columnheader", { name: "Change" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Change [+-]/)).not.toBeInTheDocument();
   });
 
-  it("does not use sticky table header offsets", () => {
-    const { container } = renderAlternativeBoard(
+  it("uses sticky table header offsets on the hidden board", () => {
+    renderAlternativeBoard(
       <AlternativeBoard boardData={boardData()} initialTab="teams" />,
     );
 
-    expect(container.innerHTML).not.toContain("top-11");
+    expect(screen.getByTestId("teams-column-header")).toHaveClass("top-11");
+    expect(screen.getByTestId("teams-row-scroll")).not.toContainElement(
+      screen.getByTestId("teams-column-header"),
+    );
   });
 });
 
