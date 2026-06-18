@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAlternativeBadgeRows,
   buildAlternativeBoardRows,
   buildAlternativeTeamBoardRows,
   formatAlternativeScore,
@@ -196,7 +197,7 @@ describe("alternative board data", () => {
     expect(formatAlternativeScore(41.55)).toBe("41.6");
   });
 
-  it("ranks allocated teams by raw team points with shared ranks", () => {
+  it("ranks allocated teams by final displayed order", () => {
     const rows = buildAlternativeTeamBoardRows(
       boardData({
         teams: [
@@ -214,9 +215,46 @@ describe("alternative board data", () => {
 
     expect(rows.map((row) => [row.teamName, row.rank, row.points])).toEqual([
       ["Argentina", 1, 10],
-      ["Brazil", 1, 10],
+      ["Brazil", 2, 10],
       ["Canada", 3, 4],
     ]);
+  });
+
+  it("sorts allocated team ties by status, wins, goal difference, goals for, goals against, and name", () => {
+    const rows = buildAlternativeTeamBoardRows(
+      boardData({
+        teams: [
+          team("status", "Status Winner", 10, "andy", { status: "winner" }),
+          team("wins", "Wins Team", 10, "andy"),
+          team("gd", "Goal Difference Team", 10, "andy"),
+          team("gf", "Goals For Team", 10, "andy"),
+          team("ga-low", "Goals Against Low", 10, "andy"),
+          team("ga-high", "Goals Against High", 10, "andy"),
+          team("alpha", "Alpha Team", 10, "andy"),
+          team("zulu", "Zulu Team", 10, "andy"),
+        ],
+        matches: [
+          finalMatch("wins-a", "wins", 2, 0),
+          finalMatch("wins-b", "wins", 1, 0),
+          finalMatch("gd-a", "gd", 3, 0),
+          finalMatch("gf-a", "gf", 5, 3),
+          finalMatch("ga-low-a", "ga-low", 3, 1),
+          finalMatch("ga-high-a", "ga-high", 4, 2),
+        ],
+      }),
+    );
+
+    expect(rows.map((row) => row.teamName)).toEqual([
+      "Status Winner",
+      "Wins Team",
+      "Goal Difference Team",
+      "Goals For Team",
+      "Goals Against High",
+      "Goals Against Low",
+      "Alpha Team",
+      "Zulu Team",
+    ]);
+    expect(rows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it("derives team record and goals from final matches only", () => {
@@ -304,8 +342,123 @@ describe("alternative board data", () => {
     );
 
     expect(rows.find((row) => row.teamName === "Japan")?.nextFixture).toBe(
-      "Norway v Japan (20 Jun 2026, 20:00)",
+      "v Norway (20 Jun 2026, 20:00)",
     );
+    expect(rows.find((row) => row.teamName === "Norway")?.nextFixture).toBe(
+      "v Japan (20 Jun 2026, 20:00)",
+    );
+  });
+
+  it("calculates hidden alternative board badges from team-level rows", () => {
+    const rows = buildAlternativeBadgeRows(
+      boardData({
+        badges: [
+          badge("badge-first", "1st Place"),
+          badge("badge-second", "2nd Place"),
+          badge("badge-third", "3rd Place"),
+          badge("badge-fourth", "4th Place"),
+          badge("badge-wooden", "Wooden Spoon"),
+          badge("badge-first-out", "First Knocked Out"),
+          badge("badge-conceded", "Most Goals Conceded"),
+          badge("badge-fewest", "Fewest Goals Scored"),
+        ],
+        teams: [
+          team("argentina", "Argentina", 10, "andy", {
+            allocatedToName: "Andy",
+          }),
+          team("brazil", "Brazil", 8, "jobin", {
+            allocatedToName: "Jobin",
+          }),
+          team("canada", "Canada", 6, "andy", {
+            allocatedToName: "Andy",
+          }),
+          team("denmark", "Denmark", 4, "jobin", {
+            allocatedToName: "Jobin",
+          }),
+          team("ecuador", "Ecuador", 2, "andy", {
+            allocatedToName: "Andy",
+          }),
+          team("fiji", "Fiji", 0, "jobin", {
+            allocatedToName: "Jobin",
+          }),
+        ],
+        matches: [
+          match({
+            id: "arg-bra",
+            status: "final",
+            homeTeamId: "argentina",
+            homeTeamName: "Argentina",
+            awayTeamId: "brazil",
+            awayTeamName: "Brazil",
+            homeScore: 3,
+            awayScore: 2,
+          }),
+          match({
+            id: "can-den",
+            status: "final",
+            homeTeamId: "canada",
+            homeTeamName: "Canada",
+            awayTeamId: "denmark",
+            awayTeamName: "Denmark",
+            homeScore: 5,
+            awayScore: 0,
+          }),
+          match({
+            id: "ecu-bra",
+            status: "final",
+            homeTeamId: "ecuador",
+            homeTeamName: "Ecuador",
+            awayTeamId: "brazil",
+            awayTeamName: "Brazil",
+            homeScore: 1,
+            awayScore: 2,
+          }),
+        ],
+      }),
+    );
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        label: "1st Place",
+        holderLabels: ["Andy (Argentina)"],
+        supportLine: "Top scoring team.",
+      }),
+      expect.objectContaining({
+        label: "2nd Place",
+        holderLabels: ["Jobin (Brazil)"],
+        supportLine: "Second highest scoring team.",
+      }),
+      expect.objectContaining({
+        label: "3rd Place",
+        holderLabels: ["Andy (Canada)"],
+        supportLine: "Third highest scoring team.",
+      }),
+      expect.objectContaining({
+        label: "4th Place",
+        holderLabels: ["Jobin (Denmark)"],
+        supportLine: "Fourth highest scoring team.",
+      }),
+      expect.objectContaining({
+        label: "Wooden Spoon",
+        holderLabels: ["Jobin (Fiji)"],
+        supportLine: "Lowest scoring team.",
+      }),
+      expect.objectContaining({
+        label: "First Knocked Out",
+        holderLabels: [],
+        supportLine: "First team eliminated.",
+      }),
+      expect.objectContaining({
+        label: "Most Goals Conceded",
+        holderLabels: ["Jobin (Denmark)"],
+        supportLine: "Team with the most goals conceded.",
+      }),
+      expect.objectContaining({
+        label: "Fewest Goals Scored",
+        holderLabels: ["Jobin (Denmark)"],
+        supportLine: "Team with the fewest goals scored.",
+      }),
+    ]);
   });
 });
 
@@ -314,6 +467,7 @@ function team(
   name: string,
   points: number,
   allocatedTo: string,
+  overrides: Partial<SharedBoardData["teams"][number]> = {},
 ): SharedBoardData["teams"][number] {
   return {
     id,
@@ -330,6 +484,38 @@ function team(
     allocatedTo,
     allocatedToName: allocatedTo,
     flagAssetPath: null,
+    ...overrides,
+  };
+}
+
+function finalMatch(
+  id: string,
+  homeTeamId: string,
+  homeScore: number,
+  awayScore: number,
+): SharedBoardData["matches"][number] {
+  return match({
+    id,
+    status: "final",
+    homeTeamId,
+    homeTeamName: homeTeamId,
+    awayTeamId: "opponent",
+    awayTeamName: "Opponent",
+    homeScore,
+    awayScore,
+  });
+}
+
+function badge(
+  id: string,
+  label: string,
+): SharedBoardData["badges"][number] {
+  return {
+    id,
+    label,
+    status: "active",
+    holderParticipantIds: [],
+    supportLine: "Official support line.",
   };
 }
 

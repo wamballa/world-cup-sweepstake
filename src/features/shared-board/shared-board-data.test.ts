@@ -378,7 +378,7 @@ describe("shared board data mapper", () => {
     expect(board.badges[0]).toMatchObject({
       label: "1st Place",
       holderParticipantIds: ["participant-1"],
-      supportLine: "Highest participant total from cached tournament data.",
+      supportLine: "Top scoring team.",
     });
   });
 

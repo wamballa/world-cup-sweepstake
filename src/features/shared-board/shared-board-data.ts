@@ -167,14 +167,14 @@ export type SharedBoardMapperInput = {
 };
 
 const badgeSupportLines: Record<string, string> = {
-  "first-place": "Highest participant total from cached tournament data.",
-  "second-place": "Second-highest participant total from cached tournament data.",
-  "third-place": "Third-highest participant total from cached tournament data.",
-  "fourth-place": "Fourth-highest participant total from cached tournament data.",
-  "wooden-spoon": "Lowest participant total from cached tournament data.",
-  "first-knocked-out": "Allocated the first team eliminated from cached results.",
-  "most-goals-conceded": "Allocated the team with the most goals conceded.",
-  "fewest-goals-scored": "Allocated the team with the fewest goals scored.",
+  "first-place": "Top scoring team.",
+  "second-place": "Second highest scoring team.",
+  "third-place": "Third highest scoring team.",
+  "fourth-place": "Fourth highest scoring team.",
+  "wooden-spoon": "Lowest scoring team.",
+  "first-knocked-out": "First team eliminated.",
+  "most-goals-conceded": "Team with the most goals conceded.",
+  "fewest-goals-scored": "Team with the fewest goals scored.",
 };
 
 export function buildSharedBoardData(

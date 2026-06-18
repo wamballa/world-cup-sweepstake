@@ -42,18 +42,42 @@ const sharedBoardTabTriggerClassName =
 
 const sharedBoardTableHeadClassName =
   "bg-campaign-muted font-black text-white hover:bg-campaign-muted hover:text-white";
+const sharedBoardGridHeadClassName =
+  "bg-campaign-muted px-2 py-2 text-left text-sm font-black text-white";
+
+export type SharedScoreboardExtraTab = {
+  value: string;
+  label: string;
+  icon: ReactNode;
+  content: ReactNode;
+};
 
 export function SharedScoreboard({
   selectedParticipantId,
   boardData,
   leadingParticipant,
+  defaultTab = "participants",
+  extraTabsAfterParticipants = [],
+  badgesContent,
+  explainerContent,
+  heroLeaderLabel,
+  showParticipantsHeader = false,
+  teamsContent,
 }: {
   selectedParticipantId?: string | null;
   boardData: SharedBoardData;
   leadingParticipant?: SharedBoardStanding;
+  defaultTab?: string;
+  extraTabsAfterParticipants?: SharedScoreboardExtraTab[];
+  badgesContent?: ReactNode;
+  explainerContent?: ReactNode;
+  heroLeaderLabel?: string;
+  showParticipantsHeader?: boolean;
+  teamsContent?: ReactNode;
 }) {
   const standings = boardData.standings;
   const hasStarted = boardData.summary.hasFinalMatches;
+  const tabCount = 6 + extraTabsAfterParticipants.length;
 
   return (
     <section
@@ -85,79 +109,83 @@ export function SharedScoreboard({
           </div>
           <HeroSummaryMetrics
             boardData={boardData}
+            heroLeaderLabel={heroLeaderLabel}
             leadingParticipant={leadingParticipant}
           />
         </div>
       </CampaignPanel>
 
       <CampaignPanel className="p-3 sm:p-4">
-        <Tabs defaultValue="participants" className="gap-4">
-          <TabsList className="grid h-auto w-full grid-cols-6 rounded-2xl bg-campaign-lavender/40 p-1">
-            <TabsTrigger
+        <Tabs defaultValue={defaultTab} className="gap-4">
+          <TabsList
+            className="grid h-auto w-full rounded-2xl bg-campaign-lavender/40 p-1"
+            style={{
+              gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))`,
+            }}
+          >
+            <SharedScoreboardTabTrigger
               value="participants"
-              className={sharedBoardTabTriggerClassName}
-              aria-label="Participants"
-            >
-              <UsersRound className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Participants</span>
-            </TabsTrigger>
-            <TabsTrigger
+              label="Participants"
+              icon={<UsersRound className="size-4" aria-hidden="true" />}
+            />
+            {extraTabsAfterParticipants.map((tab) => (
+              <SharedScoreboardTabTrigger
+                key={tab.value}
+                value={tab.value}
+                label={tab.label}
+                icon={tab.icon}
+              />
+            ))}
+            <SharedScoreboardTabTrigger
               value="teams"
-              className={sharedBoardTabTriggerClassName}
-              aria-label="Teams"
-            >
-              <ShieldCheck className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Teams</span>
-            </TabsTrigger>
-            <TabsTrigger
+              label="Teams"
+              icon={<ShieldCheck className="size-4" aria-hidden="true" />}
+            />
+            <SharedScoreboardTabTrigger
               value="badges"
-              className={sharedBoardTabTriggerClassName}
-              aria-label="Badges"
-            >
-              <Medal className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Badges</span>
-            </TabsTrigger>
-            <TabsTrigger
+              label="Badges"
+              icon={<Medal className="size-4" aria-hidden="true" />}
+            />
+            <SharedScoreboardTabTrigger
               value="matches"
-              className={sharedBoardTabTriggerClassName}
-              aria-label="Matches"
-            >
-              <CalendarDays className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Matches</span>
-            </TabsTrigger>
-            <TabsTrigger
+              label="Matches"
+              icon={<CalendarDays className="size-4" aria-hidden="true" />}
+            />
+            <SharedScoreboardTabTrigger
               value="stats"
-              className={sharedBoardTabTriggerClassName}
-              aria-label="Stats"
-            >
-              <Gauge className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Stats</span>
-            </TabsTrigger>
-            <TabsTrigger
+              label="Stats"
+              icon={<Gauge className="size-4" aria-hidden="true" />}
+            />
+            <SharedScoreboardTabTrigger
               value="explainer"
-              className={sharedBoardTabTriggerClassName}
-              aria-label="Explainer"
-            >
-              <CircleHelp className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Explainer</span>
-            </TabsTrigger>
+              label="Explainer"
+              icon={<CircleHelp className="size-4" aria-hidden="true" />}
+            />
           </TabsList>
 
           <TabsContent value="participants">
             <ParticipantsPanel
               selectedParticipantId={selectedParticipantId}
               boardData={boardData}
+              showHeader={showParticipantsHeader}
             />
           </TabsContent>
+          {extraTabsAfterParticipants.map((tab) => (
+            <TabsContent key={tab.value} value={tab.value}>
+              {tab.content}
+            </TabsContent>
+          ))}
           <TabsContent value="teams">
-            <TeamsPanel boardData={boardData} />
+            {teamsContent ?? <TeamsPanel boardData={boardData} />}
           </TabsContent>
           <TabsContent value="badges">
-            <BadgesPanel
-              badges={boardData.badges}
-              hasFinalMatches={boardData.summary.hasFinalMatches}
-              standings={standings}
-            />
+            {badgesContent ?? (
+              <BadgesPanel
+                badges={boardData.badges}
+                hasFinalMatches={boardData.summary.hasFinalMatches}
+                standings={standings}
+              />
+            )}
           </TabsContent>
           <TabsContent value="matches">
             <MatchesPanel matches={boardData.matches} />
@@ -172,7 +200,7 @@ export function SharedScoreboard({
             />
           </TabsContent>
           <TabsContent value="explainer">
-            <ExplainerPanel />
+            {explainerContent ?? <ExplainerPanel />}
           </TabsContent>
         </Tabs>
       </CampaignPanel>
@@ -180,11 +208,34 @@ export function SharedScoreboard({
   );
 }
 
+function SharedScoreboardTabTrigger({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <TabsTrigger
+      value={value}
+      className={sharedBoardTabTriggerClassName}
+      aria-label={label}
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </TabsTrigger>
+  );
+}
+
 function HeroSummaryMetrics({
   boardData,
+  heroLeaderLabel,
   leadingParticipant,
 }: {
   boardData: SharedBoardData;
+  heroLeaderLabel?: string;
   leadingParticipant?: SharedBoardStanding;
 }) {
   if (!boardData.summary.hasFinalMatches) {
@@ -204,7 +255,12 @@ function HeroSummaryMetrics({
     <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1.5fr)_1fr_1fr]">
       <HeroSummaryMetric
         label="Leader"
-        value={leadingParticipant?.name ?? boardData.summary.leaderName ?? "-"}
+        value={
+          heroLeaderLabel ??
+          leadingParticipant?.name ??
+          boardData.summary.leaderName ??
+          "-"
+        }
       />
       <HeroSummaryMetric
         label="Completed"
@@ -237,63 +293,44 @@ function HeroSummaryMetric({ label, value }: { label: string; value: string }) {
 function ParticipantsPanel({
   selectedParticipantId,
   boardData,
+  showHeader = false,
 }: {
   selectedParticipantId?: string | null;
   boardData: SharedBoardData;
+  showHeader?: boolean;
 }) {
   const standings = boardData.standings;
   const featuredParticipant = standings.find(
     (standing) => standing.participantId === selectedParticipantId,
   );
 
+  if (showHeader) {
+    return (
+      <div
+        className="overflow-hidden rounded-2xl bg-campaign-panel-soft"
+        data-testid="participants-table-frame"
+      >
+        <ParticipantsHeader />
+        {standings.map((standing, index) => (
+          <ParticipantStandingRow
+            key={standing.participantId}
+            index={index}
+            standing={standing}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="space-y-3">
         {standings.map((standing, index) => (
-          <motion.div
+          <ParticipantStandingRow
             key={standing.participantId}
-            className={`rounded-2xl p-3 ${
-              index === 0 ? "bg-campaign-blush" : "bg-campaign-page"
-            }`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.025 }}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <div
-                  className={`flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
-                    index === 0 ? "bg-campaign-magenta" : "bg-campaign-purple"
-                  }`}
-                >
-                  #{standing.rank}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate font-black text-campaign-ink">
-                    {standing.name}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {standing.teamNames.map((teamName, teamIndex) => (
-                      <Badge
-                        key={`${standing.participantId}-${standing.teamIds[teamIndex] ?? teamIndex}`}
-                        className="max-w-full truncate bg-white text-campaign-muted hover:bg-white"
-                      >
-                        {teamName}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-black text-campaign-purple-strong">
-                  {standing.points}
-                </p>
-                <p className="text-xs font-semibold text-campaign-muted">
-                  {standing.teamCount} teams
-                </p>
-              </div>
-            </div>
-          </motion.div>
+            index={index}
+            standing={standing}
+          />
         ))}
       </div>
       <div className="space-y-3">
@@ -337,6 +374,82 @@ function ParticipantsPanel({
             No email provider is connected during this phase.
           </p>
         </CampaignPanel>
+      </div>
+    </div>
+  );
+}
+
+function ParticipantStandingRow({
+  index,
+  standing,
+}: {
+  index: number;
+  standing: SharedBoardStanding;
+}) {
+  return (
+    <motion.div
+      className={`p-3 ${
+        index === 0 ? "bg-campaign-blush" : "bg-campaign-page"
+      } ${index > 0 ? "border-t border-campaign-ring" : ""}`}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.025 }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            className={`flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
+              index === 0 ? "bg-campaign-magenta" : "bg-campaign-purple"
+            }`}
+          >
+            #{standing.rank}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate font-black text-campaign-ink">
+              {standing.name}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {standing.teamNames.map((teamName, teamIndex) => (
+                <Badge
+                  key={`${standing.participantId}-${standing.teamIds[teamIndex] ?? teamIndex}`}
+                  className="max-w-full truncate bg-white text-campaign-muted hover:bg-white"
+                >
+                  {teamName}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-black text-campaign-purple-strong">
+            {standing.points}
+          </p>
+          <p className="text-xs font-semibold text-campaign-muted">
+            {standing.teamCount} teams
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function ParticipantsHeader() {
+  return (
+    <div
+      className="grid grid-cols-[5rem_minmax(0,1fr)_8rem] overflow-hidden rounded-t-2xl"
+      role="row"
+    >
+      <div className={sharedBoardGridHeadClassName} role="columnheader">
+        Rank
+      </div>
+      <div className={sharedBoardGridHeadClassName} role="columnheader">
+        Participant
+      </div>
+      <div
+        className={`${sharedBoardGridHeadClassName} text-right`}
+        role="columnheader"
+      >
+        Total points
       </div>
     </div>
   );
