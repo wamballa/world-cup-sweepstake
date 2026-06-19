@@ -88,6 +88,7 @@ export type SharedBoardData = {
   sweepstakeName: string;
   tournamentCode: string;
   sharedViewMode: "participant_board" | "countdown";
+  boardVariant: "official" | "alternative";
   participants: SharedBoardParticipant[];
   standings: SharedBoardStanding[];
   teams: SharedBoardTeam[];
@@ -104,6 +105,7 @@ export type SharedBoardMapperInput = {
     name: string;
     tournament_code: string;
     shared_view_mode?: "participant_board" | "countdown";
+    board_variant?: "official" | "alternative" | null;
   };
   participants: Array<{
     id: string;
@@ -298,6 +300,10 @@ export function buildSharedBoardData(
     sweepstakeName: input.sweepstake.name,
     tournamentCode: input.sweepstake.tournament_code,
     sharedViewMode: input.sweepstake.shared_view_mode ?? "participant_board",
+    boardVariant:
+      input.sweepstake.board_variant === "alternative"
+        ? "alternative"
+        : "official",
     participants,
     standings,
     teams: sharedTeams,

@@ -100,6 +100,7 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
     { data: auditRows, error: auditError },
     { data: teamRows, error: teamError },
     viewModeResult,
+    boardVariantResult,
   ] = await Promise.all([
     supabase
       .from("participants")
@@ -128,6 +129,7 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
       )
       .order("name", { ascending: true }),
     loadSharedViewModes(supabase, sweepstakeIds),
+    loadBoardVariants(supabase, sweepstakeIds),
   ]);
 
   if (participantError) {
@@ -173,6 +175,14 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
         : ("participant_board" as const),
     ]),
   );
+  const boardVariants = new Map(
+    (boardVariantResult.data ?? []).map((row) => [
+      String(row.id),
+      row.board_variant === "alternative"
+        ? ("alternative" as const)
+        : ("official" as const),
+    ]),
+  );
 
   return (sweepstakes ?? []).map((sweepstake) => {
     const tournament = getFootballDataTournamentByCode(sweepstake.tournament_code);
@@ -211,6 +221,7 @@ async function loadAdminSweepstakes(userId: string): Promise<AccountSweepstake[]
       tournamentCode: tournament.code,
       tournamentLabel: tournament.label,
       sharedViewMode: viewModes.get(sweepstake.id) ?? "participant_board",
+      boardVariant: boardVariants.get(sweepstake.id) ?? "official",
       isOwner: (adminRows ?? []).some(
         (admin) =>
           admin.sweepstake_id === sweepstake.id &&
@@ -252,6 +263,28 @@ async function loadSharedViewModes(
     .in("id", sweepstakeIds);
 
   if (error && error.message.includes("shared_view_mode")) {
+    return { data: [] };
+  }
+
+  if (error) {
+    throw error;
+  }
+
+  return { data: data ?? [] };
+}
+
+async function loadBoardVariants(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  sweepstakeIds: string[],
+): Promise<{
+  data: Array<{ id: string; board_variant: string | null }>;
+}> {
+  const { data, error } = await supabase
+    .from("sweepstakes")
+    .select("id, board_variant")
+    .in("id", sweepstakeIds);
+
+  if (error && error.message.includes("board_variant")) {
     return { data: [] };
   }
 

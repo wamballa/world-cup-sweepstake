@@ -16,6 +16,7 @@ function boardData(overrides: Partial<SharedBoardData> = {}): SharedBoardData {
     sweepstakeName: "Office Draw",
     tournamentCode: "WC_2026",
     sharedViewMode: "participant_board",
+    boardVariant: "official",
     participants: [
       {
         id: "andy",

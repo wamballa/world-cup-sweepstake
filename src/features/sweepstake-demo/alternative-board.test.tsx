@@ -387,6 +387,7 @@ function boardData(): SharedBoardData {
     sweepstakeName: "Engineering",
     tournamentCode: "WC_2026",
     sharedViewMode: "participant_board",
+    boardVariant: "official",
     participants: [
       {
         id: "andy",

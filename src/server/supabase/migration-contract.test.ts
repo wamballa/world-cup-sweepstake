@@ -136,6 +136,16 @@ const leaderboardSnapshotsMigration = readFileSync(
   "utf8",
 );
 
+const boardVariantMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260619100000_board_variant.sql",
+  ),
+  "utf8",
+);
+
 describe("AI generation cache migration contract", () => {
   it("deduplicates AI generations by sweepstake, feature, and input hash", () => {
     expect(aiCacheMigration).toContain(
@@ -222,5 +232,22 @@ describe("Leaderboard snapshot migration contract", () => {
     );
     expect(leaderboardSnapshotsMigration).not.toContain("for insert");
     expect(leaderboardSnapshotsMigration).not.toContain("to anon");
+  });
+});
+
+describe("Board variant migration contract", () => {
+  it("adds a sweepstake-level board variant without changing snapshots", () => {
+    expect(boardVariantMigration).toContain("create type public.board_variant");
+    expect(boardVariantMigration).toContain("'official', 'alternative'");
+    expect(boardVariantMigration).toContain(
+      "add column if not exists board_variant public.board_variant not null default 'official'",
+    );
+    expect(boardVariantMigration).toContain(
+      "create or replace function public.get_sweepstake_by_share_token",
+    );
+    expect(boardVariantMigration).toContain(
+      "board_variant public.board_variant",
+    );
+    expect(boardVariantMigration).not.toContain("leaderboard_snapshot_rows");
   });
 });

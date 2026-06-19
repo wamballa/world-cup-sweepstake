@@ -12,6 +12,7 @@ const boardData: SharedBoardData = {
   sweepstakeName: "Office Draw",
   tournamentCode: "WC_2026",
   sharedViewMode: "countdown",
+  boardVariant: "official",
   participants: [
     { id: "participant-1", name: "Maya", emailUpdatesEnabled: false },
     { id: "participant-2", name: "Theo", emailUpdatesEnabled: false },

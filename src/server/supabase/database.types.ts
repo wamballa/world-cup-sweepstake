@@ -14,6 +14,7 @@ export type Database = {
         | "rerun"
         | "manual_move";
       badge_status: "active" | "undecided" | "manual_future";
+      board_variant: "official" | "alternative";
       leaderboard_snapshot_trigger:
         | "initial_baseline"
         | "completed_match_change"
@@ -302,6 +303,7 @@ export type Database = {
           tournament_code: string;
           status: Database["public"]["Enums"]["sweepstake_status"];
           shared_view_mode: Database["public"]["Enums"]["shared_view_mode"];
+          board_variant: Database["public"]["Enums"]["board_variant"];
           share_token: string;
           created_by: string;
           created_at: string;
@@ -313,6 +315,7 @@ export type Database = {
           tournament_code?: string;
           status?: Database["public"]["Enums"]["sweepstake_status"];
           shared_view_mode?: Database["public"]["Enums"]["shared_view_mode"];
+          board_variant?: Database["public"]["Enums"]["board_variant"];
           share_token?: string;
           created_by: string;
           created_at?: string;
@@ -518,6 +521,7 @@ export type Database = {
           tournament_code: string;
           status: Database["public"]["Enums"]["sweepstake_status"];
           shared_view_mode: Database["public"]["Enums"]["shared_view_mode"];
+          board_variant: Database["public"]["Enums"]["board_variant"];
           created_at: string;
           updated_at: string;
         }[];

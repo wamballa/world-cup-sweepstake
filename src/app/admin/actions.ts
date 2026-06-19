@@ -56,6 +56,8 @@ const teamAllocationsTable = "team_allocations" as string;
 const allocationAuditEventsTable = "allocation_audit_events" as string;
 const sharedViewModes = ["participant_board", "countdown"] as const;
 type SharedViewMode = (typeof sharedViewModes)[number];
+const boardVariants = ["official", "alternative"] as const;
+type BoardVariant = (typeof boardVariants)[number];
 
 const defaultBadgeCategories = [
   { key: "first-place", label: "1st Place" },
@@ -175,6 +177,7 @@ export async function createOwnedSweepstake(name: string) {
     tournamentCode: defaultFootballDataTournament.code,
     tournamentLabel: defaultFootballDataTournament.label,
     sharedViewMode: "participant_board" as const,
+    boardVariant: "official" as const,
     isOwner: true,
     participants: [],
     adminEmails: "",
@@ -708,6 +711,7 @@ export async function saveSweepstakeSharedViewMode(input: {
   }
 
   revalidatePath("/admin");
+  revalidatePath("/s/[shareToken]", "page");
 }
 
 function isMissingSharedViewModeColumnError(error: Error & { code?: string }) {
@@ -715,6 +719,51 @@ function isMissingSharedViewModeColumnError(error: Error & { code?: string }) {
     error.code === "PGRST204" ||
     error.code === "42703" ||
     error.message.includes("shared_view_mode")
+  );
+}
+
+export async function saveSweepstakeBoardVariant(input: {
+  sweepstakeId: string;
+  boardVariant: BoardVariant;
+  shareToken?: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const user = await requireCurrentUser();
+
+  await requireSweepstakeAdmin(supabase, user.id, input.sweepstakeId);
+
+  if (!boardVariants.includes(input.boardVariant)) {
+    throw new Error("Choose a valid main board UI.");
+  }
+
+  const { error } = await supabase
+    .from(sweepstakesTable)
+    .update({ board_variant: input.boardVariant })
+    .eq("id", input.sweepstakeId);
+
+  if (error) {
+    if (isMissingBoardVariantColumnError(error)) {
+      throw new Error(
+        "Main board UI switching is ready in the app, but the Supabase migration has not been applied yet. Apply supabase/migrations/20260619100000_board_variant.sql, then try again.",
+      );
+    }
+
+    throw error;
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/s/[shareToken]", "page");
+
+  if (input.shareToken) {
+    revalidatePath(`/s/${input.shareToken}`);
+  }
+}
+
+function isMissingBoardVariantColumnError(error: Error & { code?: string }) {
+  return (
+    error.code === "PGRST204" ||
+    error.code === "42703" ||
+    error.message.includes("board_variant")
   );
 }
 

@@ -107,6 +107,42 @@ function boardInput(
 }
 
 describe("shared board data mapper", () => {
+  it("defaults the main board variant to official", () => {
+    const board = buildSharedBoardData(boardInput());
+
+    expect(board.boardVariant).toBe("official");
+  });
+
+  it("maps the alternative main board variant for real sweepstakes", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        sweepstake: {
+          id: "sweepstake-1",
+          name: "Team1",
+          tournament_code: "WC_2026",
+          board_variant: "alternative",
+        },
+      }),
+    );
+
+    expect(board.boardVariant).toBe("alternative");
+  });
+
+  it("falls back to official for an unreadable board variant", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        sweepstake: {
+          id: "sweepstake-1",
+          name: "Team1",
+          tournament_code: "WC_2026",
+          board_variant: "unexpected" as "official",
+        },
+      }),
+    );
+
+    expect(board.boardVariant).toBe("official");
+  });
+
   it("formats summer kickoffs in UK time", () => {
     const board = buildSharedBoardData(
       boardInput({

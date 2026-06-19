@@ -178,8 +178,8 @@ function AlternativeExplainerPanel() {
           scored, goals conceded, then team name.
         </p>
         <p className="text-sm font-semibold text-campaign-ink">
-          The Participants tab shows everyone's current sweepstake position and
-          allocated teams.
+          The Participants tab shows everyone&apos;s current sweepstake position
+          and allocated teams.
         </p>
         <p className="text-sm font-semibold text-campaign-ink">
           Badges on this board are awarded by team performance and shown as

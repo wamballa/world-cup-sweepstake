@@ -1,5 +1,11 @@
 # Decision Log
 
+## 2026-06-19: Admin Board Variant Switch
+
+Decision: Add a sweepstake-level `board_variant` setting with `official` and `alternative` values so real shared URLs at `/s/[shareToken]` can render either the current `ParticipantBoard` or the existing `AlternativeBoard` without changing public share tokens. Countdown mode continues to take priority through `shared_view_mode`, and the hardcoded preview token remains on the official preview board while `/alternative-board` remains the Alternative Board preview route.
+
+Reason: A database-backed admin toggle gives immediate rollback to the official board without a deploy, preserves the old main board, avoids a risky hard route swap, and keeps `ALTERNATIVE_BOARD_ENABLED` scoped to the hidden comparison route only.
+
 ## 2026-06-14: BL-113 UK Kickoff Time Formatting
 
 Decision: Keep football-data.org `utcDate` values and Supabase `kickoff_at` timestamps as UTC instants, but format all participant-facing kickoff labels with `timeZone: "Europe/London"` and omit timezone abbreviations from the displayed label. The shared-board DTO remains the single formatting boundary used by match tables, countdowns, personal match summaries, and AI fixture context.

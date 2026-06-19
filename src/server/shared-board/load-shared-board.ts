@@ -9,6 +9,7 @@ type ShareTokenSweepstake = {
   name: string;
   tournament_code: string;
   shared_view_mode: "participant_board" | "countdown";
+  board_variant?: "official" | "alternative" | null;
 };
 
 export async function loadSharedBoardByShareToken(shareToken: string) {
@@ -34,7 +35,7 @@ export async function loadSharedBoardById(sweepstakeId: string) {
   const serviceSupabase = getSupabaseServiceRoleClient();
   const { data, error } = await serviceSupabase
     .from("sweepstakes")
-    .select("id, name, tournament_code, shared_view_mode")
+    .select("id, name, tournament_code, shared_view_mode, board_variant")
     .eq("id", sweepstakeId)
     .neq("status", "archived")
     .maybeSingle();
@@ -58,6 +59,7 @@ async function loadSharedBoardForSweepstake(
     name: sharedSweepstake.name,
     tournament_code: sharedSweepstake.tournament_code,
     shared_view_mode: sharedSweepstake.shared_view_mode,
+    board_variant: sharedSweepstake.board_variant ?? "official",
   };
   const serviceSupabase = getSupabaseServiceRoleClient();
 

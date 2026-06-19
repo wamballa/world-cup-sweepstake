@@ -68,6 +68,7 @@ import {
   createOwnedSweepstake,
   deleteSweepstakeParticipant,
   saveSweepstakeAllocation,
+  saveSweepstakeBoardVariant,
   saveSweepstakeSharedViewMode,
   saveSweepstakeSettings,
   rewriteSweepstakeAiNarrative,
@@ -114,6 +115,7 @@ const manualFutureBadges = [
 type AdminScreen = "dashboard" | "setup" | "sweepstake";
 type AdminTab = "overview" | "participants" | "draw" | "settings";
 type SharedViewMode = "participant_board" | "countdown";
+type BoardVariant = "official" | "alternative";
 
 type AdminIdentity = {
   displayName: string;
@@ -127,6 +129,7 @@ export type AccountSweepstake = {
   tournamentCode: string;
   tournamentLabel: string;
   sharedViewMode: SharedViewMode;
+  boardVariant: BoardVariant;
   isOwner: boolean;
   participants: ParticipantDraft[];
   adminEmails: string;
@@ -178,6 +181,9 @@ export function AppShell({
   const [sharedViewMode, setSharedViewMode] = useState<SharedViewMode>(
     activeSweepstake?.sharedViewMode ?? "participant_board",
   );
+  const [boardVariant, setBoardVariant] = useState<BoardVariant>(
+    activeSweepstake?.boardVariant ?? "official",
+  );
   const [moveTeamId, setMoveTeamId] = useState(
     activeSweepstake?.teams[0]?.id ?? "",
   );
@@ -222,6 +228,7 @@ export function AppShell({
     setAllocations(sweepstake.allocations);
     setAuditEvents(sweepstake.auditEvents);
     setSharedViewMode(sweepstake.sharedViewMode);
+    setBoardVariant(sweepstake.boardVariant);
     setMoveTeamId(sweepstake.allocations[0]?.teamId ?? sweepstake.teams[0]?.id ?? "");
     setMoveParticipantId(
       sweepstake.allocations[0]?.participantId ??
@@ -253,6 +260,7 @@ export function AppShell({
     setAllocations([]);
     setAuditEvents([]);
     setSharedViewMode(createdSweepstake.sharedViewMode);
+    setBoardVariant(createdSweepstake.boardVariant);
     setMoveTeamId(createdSweepstake.teams[0]?.id ?? "");
     setMoveParticipantId("");
     setSaveStatus("Sweepstake saved to your account.");
@@ -583,6 +591,37 @@ export function AppShell({
     }
   }
 
+  async function changeBoardVariant(nextVariant: BoardVariant) {
+    if (!activeSweepstake) {
+      return;
+    }
+
+    setSaveStatus("Updating main board UI...");
+
+    try {
+      await saveSweepstakeBoardVariant({
+        sweepstakeId: activeSweepstake.id,
+        boardVariant: nextVariant,
+        shareToken: activeSweepstake.shareToken,
+      });
+      setBoardVariant(nextVariant);
+      setSweepstakes((current) =>
+        current.map((sweepstake) =>
+          sweepstake.id === activeSweepstake.id
+            ? { ...sweepstake, boardVariant: nextVariant }
+            : sweepstake,
+        ),
+      );
+      setSaveStatus(
+        nextVariant === "alternative"
+          ? "Shared link now opens the Alternative board UI."
+          : "Shared link now opens the Official board UI.",
+      );
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
+  }
+
   async function saveParticipantEdit(
     participantId: string,
     field: "name" | "email",
@@ -707,6 +746,7 @@ export function AppShell({
     setAllocations([]);
     setAuditEvents([]);
     setSharedViewMode("participant_board");
+    setBoardVariant("official");
     setMoveTeamId("");
     setMoveParticipantId("");
     setSaveStatus("Sweepstake archived. Its shared link is now inactive.");
@@ -770,6 +810,7 @@ export function AppShell({
                 participants={participants}
                 shareCopied={shareCopied}
                 shareLink={shareLink}
+                boardVariant={boardVariant}
                 sharedViewMode={sharedViewMode}
                 isOwner={activeSweepstake?.isOwner ?? false}
                 isRewritingAi={isRewritingAi}
@@ -788,6 +829,7 @@ export function AppShell({
                 onAddBulkParticipants={addBulkParticipants}
                 onAdminEmailsChange={setAdminEmails}
                 onApplyManualMove={applyManualMove}
+                onBoardVariantChange={changeBoardVariant}
                 onCopyShareLink={copyShareLink}
                 onSharedViewModeChange={changeSharedViewMode}
                 onArchiveSweepstake={archiveSweepstakeFromAccount}
@@ -1115,6 +1157,7 @@ function SweepstakeAdminTabs({
   adminEmails,
   allocations,
   auditEvents,
+  boardVariant,
   canAllocate,
   duplicateNames,
   emailCount,
@@ -1142,6 +1185,7 @@ function SweepstakeAdminTabs({
   onAdminEmailsChange,
   onApplyManualMove,
   onArchiveSweepstake,
+  onBoardVariantChange,
   onBulkParticipantTextChange,
   onCopyShareLink,
   onSharedViewModeChange,
@@ -1162,6 +1206,7 @@ function SweepstakeAdminTabs({
   adminEmails: string;
   allocations: TeamAllocation[];
   auditEvents: AllocationAudit[];
+  boardVariant: BoardVariant;
   canAllocate: boolean;
   duplicateNames: string[];
   emailCount: number;
@@ -1189,6 +1234,7 @@ function SweepstakeAdminTabs({
   onAdminEmailsChange: (value: string) => void;
   onApplyManualMove: () => void;
   onArchiveSweepstake: () => void;
+  onBoardVariantChange: (variant: BoardVariant) => void;
   onBulkParticipantTextChange: (value: string) => void;
   onCopyShareLink: () => void;
   onSharedViewModeChange: (mode: SharedViewMode) => void;
@@ -1261,10 +1307,12 @@ function SweepstakeAdminTabs({
             participantCount={participants.length}
             shareCopied={shareCopied}
             shareLink={shareLink}
+            boardVariant={boardVariant}
             sharedViewMode={sharedViewMode}
             spreadLabel={`${spread.min}-${spread.max}`}
             teamCount={teams.length}
             syncDiagnostics={syncDiagnostics}
+            onBoardVariantChange={onBoardVariantChange}
             onCopyShareLink={onCopyShareLink}
             onSharedViewModeChange={onSharedViewModeChange}
           />
@@ -1334,6 +1382,7 @@ function SweepstakeAdminTabs({
 function OverviewTab({
   allocationCount,
   auditEventCount,
+  boardVariant,
   emailCount,
   participantCount,
   shareCopied,
@@ -1342,11 +1391,13 @@ function OverviewTab({
   spreadLabel,
   teamCount,
   syncDiagnostics,
+  onBoardVariantChange,
   onCopyShareLink,
   onSharedViewModeChange,
 }: {
   allocationCount: number;
   auditEventCount: number;
+  boardVariant: BoardVariant;
   emailCount: number;
   participantCount: number;
   shareCopied: boolean;
@@ -1355,6 +1406,7 @@ function OverviewTab({
   spreadLabel: string;
   teamCount: number;
   syncDiagnostics: SyncDiagnostics | null;
+  onBoardVariantChange: (variant: BoardVariant) => void;
   onCopyShareLink: () => void;
   onSharedViewModeChange: (mode: SharedViewMode) => void;
 }) {
@@ -1415,7 +1467,7 @@ function OverviewTab({
             </Button>
           </div>
           {allocationCount > 0 ? (
-            <div className="rounded-lg border bg-surface-muted p-3">
+            <div className="space-y-3 rounded-lg border bg-surface-muted p-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-sm font-semibold">Shared link display</p>
@@ -1443,6 +1495,37 @@ function OverviewTab({
                   >
                     <Clock3 className="size-4" aria-hidden="true" />
                     Countdown page
+                  </Button>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Main board UI</p>
+                  <p className="text-xs text-muted-foreground">
+                    Choose the board shown on the normal shared URL.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    aria-pressed={boardVariant === "official"}
+                    onClick={() => onBoardVariantChange("official")}
+                    size="sm"
+                    variant={boardVariant === "official" ? "default" : "outline"}
+                  >
+                    <LayoutDashboard className="size-4" aria-hidden="true" />
+                    Official board
+                  </Button>
+                  <Button
+                    aria-pressed={boardVariant === "alternative"}
+                    onClick={() => onBoardVariantChange("alternative")}
+                    size="sm"
+                    variant={
+                      boardVariant === "alternative" ? "default" : "outline"
+                    }
+                  >
+                    <BarChart3 className="size-4" aria-hidden="true" />
+                    Alternative board
                   </Button>
                 </div>
               </div>
