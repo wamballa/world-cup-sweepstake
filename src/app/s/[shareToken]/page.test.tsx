@@ -21,12 +21,14 @@ vi.mock("@/features/sweepstake-demo/alternative-board", () => ({
   AlternativeBoard: ({
     boardData,
     officialMovementByParticipantId,
+    shareToken,
   }: {
     boardData: SharedBoardData;
     officialMovementByParticipantId?: Record<string, string>;
+    shareToken?: string;
   }) => ({
     type: "AlternativeBoard",
-    props: { boardData, officialMovementByParticipantId },
+    props: { boardData, officialMovementByParticipantId, shareToken },
     key: null,
   }),
 }));
@@ -101,6 +103,7 @@ describe("shared sweepstake route board variant", () => {
     const page = await renderSharedPage("real-token");
 
     expect(page.type.name).toBe("AlternativeBoard");
+    expect(page.props.shareToken).toBe("real-token");
     expect(loadLatestLeaderboardSnapshotMovement).toHaveBeenCalledWith(
       "sweepstake-1",
     );

@@ -27,7 +27,7 @@ export default async function AlternativeBoardPage({
   }
 
   if (isPreview) {
-    return <AlternativeBoard boardData={boardData} />;
+    return <AlternativeBoard boardData={boardData} shareToken={shareToken} />;
   }
 
   const movement = await loadLatestLeaderboardSnapshotMovement(
@@ -38,6 +38,7 @@ export default async function AlternativeBoardPage({
     <AlternativeBoard
       boardData={boardData}
       officialMovementByParticipantId={movement.officialMovementByParticipantId}
+      shareToken={shareToken}
     />
   );
 }

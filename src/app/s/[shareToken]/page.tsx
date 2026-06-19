@@ -44,6 +44,7 @@ export default async function SharedSweepstakePage({
       <AlternativeBoard
         boardData={boardData}
         officialMovementByParticipantId={movement.officialMovementByParticipantId}
+        shareToken={shareToken}
       />
     );
   }

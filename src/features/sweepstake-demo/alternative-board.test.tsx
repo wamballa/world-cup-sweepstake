@@ -40,6 +40,24 @@ describe("AlternativeBoard", () => {
     expect(screen.queryByText("6 tabs")).not.toBeInTheDocument();
   });
 
+  it("shows the AI update button when a share token is provided", () => {
+    renderAlternativeBoard(
+      <AlternativeBoard boardData={boardData()} shareToken="real-token" />,
+    );
+
+    expect(
+      screen.getByLabelText("Open AI sweepstake update"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show the AI update button without a share token", () => {
+    renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
+
+    expect(
+      screen.queryByLabelText("Open AI sweepstake update"),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders the hidden board tabs without Fair Play", () => {
     renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
 

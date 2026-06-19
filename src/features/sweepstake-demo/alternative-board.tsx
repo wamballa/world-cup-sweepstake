@@ -25,6 +25,7 @@ import {
 import type { SharedBoardData } from "@/features/shared-board/shared-board-data";
 import type { LeaderboardMovementMap } from "@/server/shared-board/leaderboard-snapshot-movement";
 
+import { AiSweepstakeUpdateButton } from "./ai-sweepstake-update-button";
 import { SharedScoreboard } from "./shared-scoreboard";
 
 const headerCellClassName =
@@ -37,6 +38,7 @@ export function AlternativeBoard({
   boardData,
   initialTab = "participants",
   officialMovementByParticipantId,
+  shareToken,
 }: {
   boardData: SharedBoardData;
   initialTab?:
@@ -47,6 +49,7 @@ export function AlternativeBoard({
     | "stats"
     | "explainer";
   officialMovementByParticipantId?: LeaderboardMovementMap;
+  shareToken?: string;
 }) {
   const leadingParticipant = boardData.standings[0];
   const leadingTeamRow = buildAlternativeTeamBoardRows(boardData)[0];
@@ -104,6 +107,12 @@ export function AlternativeBoard({
           teamsContent={<TeamsTable boardData={boardData} />}
         />
       </CampaignPageStack>
+      {shareToken ? (
+        <AiSweepstakeUpdateButton
+          sourceUpdatedAt={boardData.syncState.lastSuccessfulSyncAt}
+          shareToken={shareToken}
+        />
+      ) : null}
     </CampaignShell>
   );
 }
