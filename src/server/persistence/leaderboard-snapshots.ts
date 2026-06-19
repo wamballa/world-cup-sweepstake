@@ -10,6 +10,7 @@ import type {
   ScoringParticipant,
   TeamScore,
 } from "@/features/scoring/sweepstake-scoring";
+import { calculateAlternativeBoardSnapshotTeamPoints } from "@/features/shared-board/alternative-board-data";
 import type { Json } from "@/server/supabase/database.types";
 
 export type LeaderboardSnapshotTrigger =
@@ -293,7 +294,10 @@ function buildAlternativeSnapshotRows(
   sweepstake: RecalculatedSweepstakeSnapshotInput,
 ) {
   const pointsByTeam = new Map(
-    sweepstake.teamScores.map((score) => [score.teamId, score.points]),
+    sweepstake.teamScores.map((score) => [
+      score.teamId,
+      calculateAlternativeBoardSnapshotTeamPoints(score),
+    ]),
   );
   const rows = sweepstake.participants.map((participant) => {
     const teamIds = sweepstake.allocations

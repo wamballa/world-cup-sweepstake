@@ -271,6 +271,12 @@ describe("AlternativeBoard", () => {
         "Each team gets group points, plus one stage bonus based on the furthest stage reached.",
       ),
     ).toBeInTheDocument();
+    expect(screen.getByText("group points + 10 pts")).toBeInTheDocument();
+    expect(screen.getByText("group points + 16 pts")).toBeInTheDocument();
+    expect(screen.getByText("group points + 24 pts")).toBeInTheDocument();
+    expect(screen.getByText("group points + 30 pts")).toBeInTheDocument();
+    expect(screen.getByText("group points + 100 pts")).toBeInTheDocument();
+    expect(screen.queryByText("group points + 25 pts")).not.toBeInTheDocument();
     expect(screen.getByText("Stage bonuses are not cumulative.")).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -284,9 +290,16 @@ describe("AlternativeBoard", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Badges on this Alternative Board are awarded by team performance and shown as Participant Name (Team Name).",
+        "The Participants tab shows everyone's current sweepstake position and allocated teams.",
       ),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Badges on this board are awarded by team performance and shown as Participant Name (Team Name).",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Alternative Board/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Luck of the Draw/)).not.toBeInTheDocument();
     expect(
       screen.getByText(
         "No predictions. No football knowledge needed. Just follow your teams.",

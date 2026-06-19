@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  alternativeBoardScoringRules,
   buildAlternativeBadgeRows,
   buildAlternativeBoardRows,
   buildAlternativeTeamBoardRows,
+  calculateAlternativeBoardSnapshotTeamPoints,
   formatAlternativeScore,
 } from "./alternative-board-data";
 import type { SharedBoardData } from "./shared-board-data";
@@ -33,8 +35,8 @@ function boardData(overrides: Partial<SharedBoardData> = {}): SharedBoardData {
         name: "Japan",
         shortName: "JPN",
         group: "C",
-        status: "group",
-        points: 74,
+        status: "winner",
+        points: 32,
         goalsFor: 0,
         goalsAgainst: 0,
         allocatedTo: "andy",
@@ -46,8 +48,8 @@ function boardData(overrides: Partial<SharedBoardData> = {}): SharedBoardData {
         name: "Norway",
         shortName: "NOR",
         group: "D",
-        status: "group",
-        points: 49,
+        status: "runner-up",
+        points: 22,
         goalsFor: 0,
         goalsAgainst: 0,
         allocatedTo: "jobin",
@@ -59,8 +61,8 @@ function boardData(overrides: Partial<SharedBoardData> = {}): SharedBoardData {
         name: "Scotland",
         shortName: "SCO",
         group: "E",
-        status: "group",
-        points: 34,
+        status: "quarter-final",
+        points: 14,
         goalsFor: 0,
         goalsAgainst: 0,
         allocatedTo: "jobin",
@@ -68,7 +70,16 @@ function boardData(overrides: Partial<SharedBoardData> = {}): SharedBoardData {
         flagAssetPath: null,
       },
     ],
-    matches: [],
+    matches: [
+      finalMatch("japan-win-1", "japan", 2, 0),
+      finalMatch("japan-win-2", "japan", 3, 1),
+      finalMatch("japan-draw", "japan", 1, 1),
+      finalMatch("norway-win-1", "norway", 2, 0),
+      finalMatch("norway-win-2", "norway", 2, 1),
+      finalMatch("norway-draw", "norway", 0, 0),
+      finalMatch("scotland-win-1", "scotland", 1, 0),
+      finalMatch("scotland-win-2", "scotland", 2, 1),
+    ],
     badges: [],
     syncState: {
       lastSuccessfulSyncAt: null,
@@ -95,18 +106,18 @@ describe("alternative board data", () => {
       {
         participantId: "andy",
         rank: 1,
-        totalOfficialTeamScore: 74,
+        totalOfficialTeamScore: 107,
         assignedTeamCount: 1,
-        alternativeScore: 74,
-        displayAlternativeScore: "74",
+        alternativeScore: 107,
+        displayAlternativeScore: "107",
       },
       {
         participantId: "jobin",
         rank: 2,
-        totalOfficialTeamScore: 83,
+        totalOfficialTeamScore: 59,
         assignedTeamCount: 2,
-        alternativeScore: 41.5,
-        displayAlternativeScore: "41.5",
+        alternativeScore: 29.5,
+        displayAlternativeScore: "29.5",
       },
     ]);
   });
@@ -132,17 +143,18 @@ describe("alternative board data", () => {
           },
         ],
         teams: [
-          team("a-1", "A One", 100.04, "a"),
-          team("b-1", "B One", 100.03, "b"),
-          team("c-1", "C One", 99.8, "c"),
+          team("a-1", "A One", 25, "a", { status: "winner" }),
+          team("b-1", "B One", 25, "b", { status: "winner" }),
+          team("c-1", "C One", 15, "c", { status: "runner-up" }),
         ],
+        matches: [],
       }),
     );
 
     expect(rows.map((row) => [row.name, row.rank, row.displayAlternativeScore])).toEqual([
       ["Ava", 1, "100"],
       ["Ben", 1, "100"],
-      ["Cara", 3, "99.8"],
+      ["Cara", 3, "30"],
     ]);
   });
 
@@ -201,23 +213,75 @@ describe("alternative board data", () => {
     const rows = buildAlternativeTeamBoardRows(
       boardData({
         teams: [
-          team("argentina", "Argentina", 10, "andy"),
-          team("brazil", "Brazil", 10, "jobin"),
-          team("canada", "Canada", 4, "andy"),
+          team("argentina", "Argentina", 25, "andy", { status: "winner" }),
+          team("brazil", "Brazil", 15, "jobin", { status: "runner-up" }),
+          team("canada", "Canada", 0, "andy"),
           {
             ...team("unallocated", "Unallocated", 99, "nobody"),
             allocatedTo: null,
             allocatedToName: null,
           },
         ],
+        matches: [],
       }),
     );
 
     expect(rows.map((row) => [row.teamName, row.rank, row.points])).toEqual([
-      ["Argentina", 1, 10],
-      ["Brazil", 2, 10],
-      ["Canada", 3, 4],
+      ["Argentina", 1, 100],
+      ["Brazil", 2, 30],
+      ["Canada", 3, 0],
     ]);
+  });
+
+  it("uses revised Alternative Board knockout bonuses without changing official points", () => {
+    expect(alternativeBoardScoringRules).toMatchObject({
+      groupStageWin: 3,
+      groupStageDraw: 1,
+      progression: {
+        "round-of-16": 10,
+        "quarter-final": 16,
+        "semi-final": 24,
+        "runner-up": 30,
+        winner: 100,
+      },
+    });
+    expect(
+      buildAlternativeTeamBoardRows(
+        boardData({
+          teams: [
+            team("winner", "Winner", 32, "andy", { status: "winner" }),
+            team("group-high", "Group High", 9, "jobin"),
+          ],
+          matches: [
+            finalMatch("winner-win-1", "winner", 2, 0),
+            finalMatch("winner-win-2", "winner", 2, 1),
+            finalMatch("winner-draw", "winner", 1, 1),
+            finalMatch("group-high-win-1", "group-high", 3, 0),
+            finalMatch("group-high-win-2", "group-high", 2, 0),
+            finalMatch("group-high-win-3", "group-high", 1, 0),
+          ],
+        }),
+      ).map((row) => [row.teamName, row.points]),
+    ).toEqual([
+      ["Winner", 107],
+      ["Group High", 9],
+    ]);
+  });
+
+  it("maps official snapshot scoring breakdowns to revised Alternative Board bonuses", () => {
+    expect(
+      calculateAlternativeBoardSnapshotTeamPoints({
+        teamId: "winner",
+        points: 32,
+        breakdown: {
+          groupStageWins: 2,
+          groupStageDraws: 1,
+          groupStageWinPoints: 6,
+          groupStageDrawPoints: 1,
+          progressionPoints: 25,
+        },
+      }),
+    ).toBe(107);
   });
 
   it("sorts allocated team ties by status, wins, goal difference, goals for, goals against, and name", () => {
@@ -365,18 +429,23 @@ describe("alternative board data", () => {
         teams: [
           team("argentina", "Argentina", 10, "andy", {
             allocatedToName: "Andy",
+            status: "winner",
           }),
           team("brazil", "Brazil", 8, "jobin", {
             allocatedToName: "Jobin",
+            status: "runner-up",
           }),
           team("canada", "Canada", 6, "andy", {
             allocatedToName: "Andy",
+            status: "semi-final",
           }),
           team("denmark", "Denmark", 4, "jobin", {
             allocatedToName: "Jobin",
+            status: "quarter-final",
           }),
           team("ecuador", "Ecuador", 2, "andy", {
             allocatedToName: "Andy",
+            status: "round-of-16",
           }),
           team("fiji", "Fiji", 0, "jobin", {
             allocatedToName: "Jobin",

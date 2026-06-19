@@ -26,10 +26,42 @@ const sharedSweepstake: RecalculatedSweepstakeSnapshotInput = {
     { participantId: "mia", teamId: "canada" },
   ],
   teamScores: [
-    { teamId: "japan", points: 74, breakdown: emptyBreakdown() },
-    { teamId: "norway", points: 49, breakdown: emptyBreakdown() },
-    { teamId: "scotland", points: 34, breakdown: emptyBreakdown() },
-    { teamId: "canada", points: 74, breakdown: emptyBreakdown() },
+    {
+      teamId: "japan",
+      points: 32,
+      breakdown: scoringBreakdown({
+        groupStageWins: 2,
+        groupStageDraws: 1,
+        progressionPoints: 25,
+      }),
+    },
+    {
+      teamId: "norway",
+      points: 22,
+      breakdown: scoringBreakdown({
+        groupStageWins: 2,
+        groupStageDraws: 1,
+        progressionPoints: 15,
+      }),
+    },
+    {
+      teamId: "scotland",
+      points: 14,
+      breakdown: scoringBreakdown({
+        groupStageWins: 2,
+        groupStageDraws: 0,
+        progressionPoints: 8,
+      }),
+    },
+    {
+      teamId: "canada",
+      points: 32,
+      breakdown: scoringBreakdown({
+        groupStageWins: 2,
+        groupStageDraws: 1,
+        progressionPoints: 25,
+      }),
+    },
   ],
   participantScores: [
     {
@@ -93,8 +125,8 @@ describe("leaderboard snapshot persistence helpers", () => {
         official_team_count: 1,
         official_team_ids: ["japan"],
         alternative_rank: 1,
-        alternative_score: 74,
-        alternative_total_points: 74,
+        alternative_score: 107,
+        alternative_total_points: 107,
         alternative_team_count: 1,
         alternative_team_ids: ["japan"],
       },
@@ -107,8 +139,8 @@ describe("leaderboard snapshot persistence helpers", () => {
         official_team_count: 2,
         official_team_ids: ["norway", "scotland"],
         alternative_rank: 3,
-        alternative_score: 41.5,
-        alternative_total_points: 83,
+        alternative_score: 29.5,
+        alternative_total_points: 59,
         alternative_team_count: 2,
         alternative_team_ids: ["norway", "scotland"],
       },
@@ -121,8 +153,8 @@ describe("leaderboard snapshot persistence helpers", () => {
         official_team_count: 1,
         official_team_ids: ["canada"],
         alternative_rank: 1,
-        alternative_score: 74,
-        alternative_total_points: 74,
+        alternative_score: 107,
+        alternative_total_points: 107,
         alternative_team_count: 1,
         alternative_team_ids: ["canada"],
       },
@@ -213,12 +245,20 @@ describe("leaderboard snapshot persistence helpers", () => {
   });
 });
 
-function emptyBreakdown() {
+function scoringBreakdown({
+  groupStageDraws,
+  groupStageWins,
+  progressionPoints,
+}: {
+  groupStageWins: number;
+  groupStageDraws: number;
+  progressionPoints: number;
+}) {
   return {
-    groupStageWins: 0,
-    groupStageDraws: 0,
-    groupStageWinPoints: 0,
-    groupStageDrawPoints: 0,
-    progressionPoints: 0,
+    groupStageWins,
+    groupStageDraws,
+    groupStageWinPoints: groupStageWins * 3,
+    groupStageDrawPoints: groupStageDraws,
+    progressionPoints,
   };
 }

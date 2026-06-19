@@ -126,11 +126,11 @@ function formatHeaderFreshnessLabel(freshnessLabel: string) {
 
 const alternativeScoringRows = [
   ["Group only", "group points (Win = 3, Draw = 1, Loss = 0)"],
-  ["Reach Round of 16", "group points + 5"],
-  ["Reach quarter-final", "group points + 8"],
-  ["Reach semi-final", "group points + 12"],
-  ["Runner-up", "group points + 15"],
-  ["Winner", "group points + 25"],
+  ["Reach Round of 16", "group points + 10 pts"],
+  ["Reach quarter-final", "group points + 16 pts"],
+  ["Reach semi-final", "group points + 24 pts"],
+  ["Runner-up", "group points + 30 pts"],
+  ["Winner", "group points + 100 pts"],
 ] as const;
 
 function AlternativeExplainerPanel() {
@@ -178,12 +178,12 @@ function AlternativeExplainerPanel() {
           scored, goals conceded, then team name.
         </p>
         <p className="text-sm font-semibold text-campaign-ink">
-          The Participants tab shows the original Luck of the Draw participant
-          view.
+          The Participants tab shows everyone's current sweepstake position and
+          allocated teams.
         </p>
         <p className="text-sm font-semibold text-campaign-ink">
-          Badges on this Alternative Board are awarded by team performance and
-          shown as Participant Name (Team Name).
+          Badges on this board are awarded by team performance and shown as
+          Participant Name (Team Name).
         </p>
         <p className="font-black text-campaign-purple-strong">
           No predictions. No football knowledge needed. Just follow your teams.

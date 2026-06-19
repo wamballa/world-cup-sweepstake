@@ -1,3 +1,5 @@
+import type { TeamScore } from "@/features/scoring/sweepstake-scoring";
+
 import type { SharedBoardData, SharedBoardTeamStatus } from "./shared-board-data";
 
 export type AlternativeBoardRow = {
@@ -36,6 +38,33 @@ export type AlternativeBadgeRow = {
   supportLine: string;
 };
 
+export const alternativeBoardScoringRules = {
+  groupStageWin: 3,
+  groupStageDraw: 1,
+  progression: {
+    group: 0,
+    "round-of-16": 10,
+    "quarter-final": 16,
+    "semi-final": 24,
+    "runner-up": 30,
+    winner: 100,
+    eliminated: 0,
+  },
+} as const satisfies {
+  groupStageWin: number;
+  groupStageDraw: number;
+  progression: Record<SharedBoardTeamStatus, number>;
+};
+
+const officialProgressionToAlternativeProgression = new Map<number, number>([
+  [0, alternativeBoardScoringRules.progression.group],
+  [5, alternativeBoardScoringRules.progression["round-of-16"]],
+  [8, alternativeBoardScoringRules.progression["quarter-final"]],
+  [12, alternativeBoardScoringRules.progression["semi-final"]],
+  [15, alternativeBoardScoringRules.progression["runner-up"]],
+  [25, alternativeBoardScoringRules.progression.winner],
+]);
+
 export function buildAlternativeBoardRows(
   boardData: SharedBoardData,
 ): AlternativeBoardRow[] {
@@ -44,7 +73,8 @@ export function buildAlternativeBoardRows(
       (team) => team.allocatedTo === participant.id,
     );
     const totalOfficialTeamScore = assignedTeams.reduce(
-      (total, team) => total + team.points,
+      (total, team) =>
+        total + calculateAlternativeBoardTeamPoints(team, boardData.matches),
       0,
     );
     const assignedTeamCount = assignedTeams.length;
@@ -214,6 +244,57 @@ export function formatAlternativeScore(score: number) {
     : roundedScore.toFixed(1);
 }
 
+export function calculateAlternativeBoardTeamPoints(
+  team: SharedBoardData["teams"][number],
+  matches: SharedBoardData["matches"],
+) {
+  const groupStageMatches = matches.filter(
+    (match) =>
+      match.status === "final" &&
+      isGroupStage(match.stage) &&
+      (match.homeTeamId === team.id || match.awayTeamId === team.id),
+  );
+  const groupStageWins = groupStageMatches.filter(
+    (match) => getGoalsFor(team.id, match) > getGoalsAgainst(team.id, match),
+  ).length;
+  const groupStageDraws = groupStageMatches.filter(
+    (match) => getGoalsFor(team.id, match) === getGoalsAgainst(team.id, match),
+  ).length;
+
+  return calculateAlternativeBoardPoints({
+    groupStageWins,
+    groupStageDraws,
+    reachedStage: team.status,
+  });
+}
+
+export function calculateAlternativeBoardSnapshotTeamPoints(score: TeamScore) {
+  const groupStagePoints =
+    score.breakdown.groupStageWinPoints + score.breakdown.groupStageDrawPoints;
+  const progressionPoints =
+    officialProgressionToAlternativeProgression.get(
+      score.breakdown.progressionPoints,
+    ) ?? score.breakdown.progressionPoints;
+
+  return groupStagePoints + progressionPoints;
+}
+
+function calculateAlternativeBoardPoints({
+  groupStageDraws,
+  groupStageWins,
+  reachedStage,
+}: {
+  groupStageWins: number;
+  groupStageDraws: number;
+  reachedStage: SharedBoardTeamStatus;
+}) {
+  return (
+    groupStageWins * alternativeBoardScoringRules.groupStageWin +
+    groupStageDraws * alternativeBoardScoringRules.groupStageDraw +
+    alternativeBoardScoringRules.progression[reachedStage]
+  );
+}
+
 export function buildAlternativeTeamBoardRows(
   boardData: SharedBoardData,
 ): AlternativeTeamBoardRow[] {
@@ -264,7 +345,7 @@ export function buildAlternativeTeamBoardRows(
         goalsFor: record.goalsFor,
         goalsAgainst: record.goalsAgainst,
         goalDifference: record.goalsFor - record.goalsAgainst,
-        points: team.points,
+        points: calculateAlternativeBoardTeamPoints(team, boardData.matches),
         status: team.status,
         nextFixture: nextMatch ? formatNextFixture(team.id, nextMatch) : "-",
       };
@@ -353,6 +434,32 @@ function sortByKickoff(
   }
 
   return a.homeTeamName.localeCompare(b.homeTeamName);
+}
+
+function isGroupStage(stage: string) {
+  return normalizeMatchStage(stage) === "group";
+}
+
+function normalizeMatchStage(stage: string) {
+  switch (stage) {
+    case "LAST_16":
+    case "ROUND_OF_16":
+    case "Round of 16":
+      return "round-of-16";
+    case "QUARTER_FINALS":
+    case "QUARTER_FINAL":
+    case "Quarter-final":
+      return "quarter-final";
+    case "SEMI_FINALS":
+    case "SEMI_FINAL":
+    case "Semi-final":
+      return "semi-final";
+    case "FINAL":
+    case "Final":
+      return "final";
+    default:
+      return "group";
+  }
 }
 
 function formatNextFixture(
