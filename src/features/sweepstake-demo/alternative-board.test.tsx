@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { SharedBoardData } from "@/features/shared-board/shared-board-data";
 
-import { AlternativeBoard } from "./alternative-board";
+import { AlternativeBoard, getFirstName } from "./alternative-board";
 import { SharedScoreboard } from "./shared-scoreboard";
 
 beforeAll(() => {
@@ -14,6 +14,25 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   };
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent() {
+        return false;
+      },
+    }),
+  });
+});
+
+beforeEach(() => {
+  window.localStorage.clear();
 });
 
 describe("AlternativeBoard", () => {
@@ -186,6 +205,31 @@ describe("AlternativeBoard", () => {
     expect(screen.getByText("Andy (Japan)")).toBeInTheDocument();
   });
 
+  it("shows the keepy-uppy accessory with the hidden board leader first name", () => {
+    renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
+
+    const keepyUppy = screen.getByTestId("leader-keepy-uppy");
+
+    expect(keepyUppy).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Andy's keepy-uppy challenge"),
+    ).toBeInTheDocument();
+    expect(within(keepyUppy).getByText("Andy")).toBeInTheDocument();
+    expect(within(keepyUppy).getByText("Keep-ups 0 · Best 0")).toBeInTheDocument();
+  });
+
+  it("hides the keepy-uppy accessory when no leader first name is available", () => {
+    const data = boardData();
+
+    data.teams = data.teams.map((team) =>
+      team.id === "japan" ? { ...team, allocatedToName: "   " } : team,
+    );
+
+    renderAlternativeBoard(<AlternativeBoard boardData={data} />);
+
+    expect(screen.queryByTestId("leader-keepy-uppy")).not.toBeInTheDocument();
+  });
+
   it("does not render the Fair Play average-score panel", () => {
     renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
 
@@ -341,6 +385,7 @@ describe("AlternativeBoard", () => {
 
     expect(screen.getByText("Official current leader.")).toBeInTheDocument();
     expect(screen.queryByText("Andy (Japan)")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("leader-keepy-uppy")).not.toBeInTheDocument();
   });
 
   it("leaves the default shared scoreboard explainer copy unchanged", () => {
@@ -392,6 +437,18 @@ describe("AlternativeBoard", () => {
     expect(screen.getByTestId("teams-row-scroll")).not.toContainElement(
       screen.getByTestId("teams-column-header"),
     );
+  });
+});
+
+describe("getFirstName", () => {
+  it("trims and returns the first token from a display name", () => {
+    expect(getFirstName("  Andy Murray  ")).toBe("Andy");
+  });
+
+  it("returns null for empty or placeholder names", () => {
+    expect(getFirstName("   ")).toBeNull();
+    expect(getFirstName("Unallocated")).toBeNull();
+    expect(getFirstName(null)).toBeNull();
   });
 });
 

@@ -26,6 +26,7 @@ import type { SharedBoardData } from "@/features/shared-board/shared-board-data"
 import type { LeaderboardMovementMap } from "@/server/shared-board/leaderboard-snapshot-movement";
 
 import { AiSweepstakeUpdateButton } from "./ai-sweepstake-update-button";
+import { LeaderKeepyUppy } from "./leader-keepy-uppy";
 import { SharedScoreboard } from "./shared-scoreboard";
 
 const headerCellClassName =
@@ -56,6 +57,7 @@ export function AlternativeBoard({
   const heroLeaderLabel = leadingTeamRow
     ? formatAlternativeTeamLeaderLabel(leadingTeamRow)
     : undefined;
+  const leaderFirstName = getFirstName(leadingTeamRow?.ownerName);
 
   return (
     <CampaignShell className="overflow-x-clip">
@@ -103,6 +105,11 @@ export function AlternativeBoard({
           stickyBoardControls
           badgesContent={<AlternativeBadgesPanel boardData={boardData} />}
           explainerContent={<AlternativeExplainerPanel />}
+          heroAccessory={
+            leaderFirstName ? (
+              <LeaderKeepyUppy leaderName={leaderFirstName} />
+            ) : undefined
+          }
           heroLeaderLabel={heroLeaderLabel}
           teamsContent={<TeamsTable boardData={boardData} />}
         />
@@ -125,6 +132,16 @@ function formatAlternativeTeamLeaderLabel({
   teamName: string;
 }) {
   return `${ownerName || "Unallocated"} (${teamName})`;
+}
+
+export function getFirstName(displayName?: string | null) {
+  const trimmedName = displayName?.trim();
+
+  if (!trimmedName || trimmedName.toLowerCase() === "unallocated") {
+    return null;
+  }
+
+  return trimmedName.split(/\s+/)[0] || null;
 }
 
 function formatHeaderFreshnessLabel(freshnessLabel: string) {

@@ -70,6 +70,7 @@ export function SharedScoreboard({
   extraTabsAfterParticipants = [],
   badgesContent,
   explainerContent,
+  heroAccessory,
   heroLeaderLabel,
   officialMovementByParticipantId,
   showParticipantsHeader = false,
@@ -83,6 +84,7 @@ export function SharedScoreboard({
   extraTabsAfterParticipants?: SharedScoreboardExtraTab[];
   badgesContent?: ReactNode;
   explainerContent?: ReactNode;
+  heroAccessory?: ReactNode;
   heroLeaderLabel?: string;
   officialMovementByParticipantId?: LeaderboardMovementMap;
   showParticipantsHeader?: boolean;
@@ -121,11 +123,14 @@ export function SharedScoreboard({
               {boardData.syncState.freshnessNotice}
             </p>
           </div>
-          <HeroSummaryMetrics
-            boardData={boardData}
-            heroLeaderLabel={heroLeaderLabel}
-            leadingParticipant={leadingParticipant}
-          />
+          <div className="grid gap-3">
+            {heroAccessory}
+            <HeroSummaryMetrics
+              boardData={boardData}
+              heroLeaderLabel={heroLeaderLabel}
+              leadingParticipant={leadingParticipant}
+            />
+          </div>
         </div>
       </CampaignPanel>
 
