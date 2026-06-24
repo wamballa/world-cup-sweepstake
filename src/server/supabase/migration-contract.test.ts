@@ -146,6 +146,16 @@ const boardVariantMigration = readFileSync(
   "utf8",
 );
 
+const keepyUppyScoresMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260622110000_keepy_uppy_scores.sql",
+  ),
+  "utf8",
+);
+
 describe("AI generation cache migration contract", () => {
   it("deduplicates AI generations by sweepstake, feature, and input hash", () => {
     expect(aiCacheMigration).toContain(
@@ -249,5 +259,39 @@ describe("Board variant migration contract", () => {
       "board_variant public.board_variant",
     );
     expect(boardVariantMigration).not.toContain("leaderboard_snapshot_rows");
+  });
+});
+
+describe("Keepy-uppy scores migration contract", () => {
+  it("adds a sweepstake-scoped high-score table with validation", () => {
+    expect(keepyUppyScoresMigration).toContain(
+      "create table if not exists public.keepy_uppy_scores",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "sweepstake_id uuid not null references public.sweepstakes(id) on delete cascade",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "player_name text not null check (char_length(trim(player_name)) between 1 and 40)",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "score integer not null check (score between 1 and 999)",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "created_at timestamptz not null default now()",
+    );
+  });
+
+  it("indexes top-score reads and keeps browser access closed by RLS", () => {
+    expect(keepyUppyScoresMigration).toContain(
+      "keepy_uppy_scores_top_scores_idx",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "on public.keepy_uppy_scores(sweepstake_id, score desc, created_at asc)",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "alter table public.keepy_uppy_scores enable row level security;",
+    );
+    expect(keepyUppyScoresMigration).not.toContain("create policy");
+    expect(keepyUppyScoresMigration).not.toContain("to anon");
   });
 });

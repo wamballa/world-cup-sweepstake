@@ -92,6 +92,12 @@ Initial tables:
 
 Use a Vercel-hosted Next.js app with Supabase as managed backend. Run scheduled football data sync through Vercel Cron. Supabase remains the cache and persistence layer; Vercel owns scheduled server-side sync execution.
 
+## Supabase Environment
+
+The workspace currently uses one managed Supabase project/database configured by `.env.local` and deployment environment variables. There is no local Supabase database or `supabase/config.toml` in this repository.
+
+Schema changes must be added as timestamped SQL files in `/supabase/migrations` and applied to the single configured Supabase project before app code that queries new columns or tables is expected to run. Runtime Supabase errors such as missing columns should be treated as likely migration drift until the remote schema is checked.
+
 ## Testing Lock
 
 - Vitest covers deterministic allocation, scoring, badge, leaderboard, match-status, and AI-input validation logic.

@@ -54,6 +54,7 @@ const sweepstakeAdminsTable = "sweepstake_admins" as string;
 const sweepstakesTable = "sweepstakes" as string;
 const teamAllocationsTable = "team_allocations" as string;
 const allocationAuditEventsTable = "allocation_audit_events" as string;
+const keepyUppyScoresTable = "keepy_uppy_scores" as string;
 const sharedViewModes = ["participant_board", "countdown"] as const;
 type SharedViewMode = (typeof sharedViewModes)[number];
 const boardVariants = ["official", "alternative"] as const;
@@ -750,6 +751,31 @@ export async function saveSweepstakeBoardVariant(input: {
 
     throw error;
   }
+
+  revalidatePath("/admin");
+  revalidatePath("/s/[shareToken]", "page");
+
+  if (input.shareToken) {
+    revalidatePath(`/s/${input.shareToken}`);
+  }
+}
+
+export async function clearSweepstakeKeepyUppyScores(input: {
+  sweepstakeId: string;
+  shareToken?: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const user = await requireCurrentUser();
+
+  await requireSweepstakeAdmin(supabase, user.id, input.sweepstakeId);
+
+  const serviceSupabase =
+    getSupabaseServiceRoleClient() as unknown as LooseSupabaseClient;
+  await deleteSweepstakeRows(
+    serviceSupabase,
+    keepyUppyScoresTable,
+    input.sweepstakeId,
+  );
 
   revalidatePath("/admin");
   revalidatePath("/s/[shareToken]", "page");

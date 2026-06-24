@@ -71,6 +71,7 @@ export function SharedScoreboard({
   badgesContent,
   explainerContent,
   heroAccessory,
+  heroContent,
   heroLeaderLabel,
   officialMovementByParticipantId,
   showParticipantsHeader = false,
@@ -85,6 +86,7 @@ export function SharedScoreboard({
   badgesContent?: ReactNode;
   explainerContent?: ReactNode;
   heroAccessory?: ReactNode;
+  heroContent?: ReactNode;
   heroLeaderLabel?: string;
   officialMovementByParticipantId?: LeaderboardMovementMap;
   showParticipantsHeader?: boolean;
@@ -106,7 +108,7 @@ export function SharedScoreboard({
       >
         <div className="absolute -right-12 -top-14 size-36 rounded-full bg-campaign-yellow" />
         <div className="absolute -bottom-14 left-16 size-32 rounded-full bg-campaign-cyan/80" />
-        <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_30rem] lg:items-end">
+        <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_30rem] lg:items-start">
           <div className="min-w-0">
             <Badge className="bg-white text-campaign-purple hover:bg-white">
               Shared scoreboard
@@ -116,12 +118,16 @@ export function SharedScoreboard({
                 ? "Leaderboard, teams, badges, and match updates"
                 : "Teams, badges, and match updates"}
             </h2>
-            <p className="mt-3 max-w-2xl text-sm font-semibold text-white/90 sm:text-base">
-              Cached tournament data. {boardData.syncState.freshnessLabel}.
-            </p>
-            <p className="mt-1 max-w-2xl text-xs font-semibold text-white/80 sm:text-sm">
-              {boardData.syncState.freshnessNotice}
-            </p>
+            {heroContent ?? (
+              <>
+                <p className="mt-3 max-w-2xl text-sm font-semibold text-white/90 sm:text-base">
+                  Cached tournament data. {boardData.syncState.freshnessLabel}.
+                </p>
+                <p className="mt-1 max-w-2xl text-xs font-semibold text-white/80 sm:text-sm">
+                  {boardData.syncState.freshnessNotice}
+                </p>
+              </>
+            )}
           </div>
           <div className="grid gap-3">
             {heroAccessory}

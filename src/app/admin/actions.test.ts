@@ -19,6 +19,11 @@ const from = vi.fn(() => ({
     return { eq };
   },
 }));
+const serviceEq = vi.fn(async () => ({ error: null }));
+const serviceDelete = vi.fn(() => ({ eq: serviceEq }));
+const serviceFrom = vi.fn(() => ({
+  delete: serviceDelete,
+}));
 const authGetUser = vi.fn(async () => ({
   data: { user: { id: "admin-1" } },
   error: null,
@@ -32,7 +37,9 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 vi.mock("@/server/supabase/client", () => ({
-  getSupabaseServiceRoleClient: () => ({}),
+  getSupabaseServiceRoleClient: () => ({
+    from: serviceFrom,
+  }),
 }));
 
 vi.mock("@/server/football-data/recalculate", () => ({
@@ -51,12 +58,16 @@ vi.mock("@/server/shared-board/load-shared-board", () => ({
   loadSharedBoardById: vi.fn(),
 }));
 
-import { saveSweepstakeBoardVariant } from "./actions";
+import {
+  clearSweepstakeKeepyUppyScores,
+  saveSweepstakeBoardVariant,
+} from "./actions";
 
 describe("admin board variant action", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     eq.mockResolvedValue({ error: null });
+    serviceEq.mockResolvedValue({ error: null });
     authGetUser.mockResolvedValue({
       data: { user: { id: "admin-1" } },
       error: null,
@@ -92,5 +103,25 @@ describe("admin board variant action", () => {
     ).rejects.toThrow("Choose a valid main board UI.");
 
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it("requires sweepstake admin authorization and clears keepy-uppy scores only", async () => {
+    await clearSweepstakeKeepyUppyScores({
+      sweepstakeId: "sweepstake-1",
+      shareToken: "share-token-1",
+    });
+
+    expect(requireSweepstakeAdmin).toHaveBeenCalledWith(
+      expect.anything(),
+      "admin-1",
+      "sweepstake-1",
+    );
+    expect(serviceFrom).toHaveBeenCalledWith("keepy_uppy_scores");
+    expect(serviceDelete).toHaveBeenCalled();
+    expect(serviceEq).toHaveBeenCalledWith("sweepstake_id", "sweepstake-1");
+    expect(update).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith("/admin");
+    expect(revalidatePath).toHaveBeenCalledWith("/s/[shareToken]", "page");
+    expect(revalidatePath).toHaveBeenCalledWith("/s/share-token-1");
   });
 });

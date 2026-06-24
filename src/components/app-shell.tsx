@@ -12,6 +12,7 @@ import {
   LogOut,
   Mail,
   Plus,
+  RotateCcw,
   Settings,
   Share2,
   ShieldCheck,
@@ -63,6 +64,7 @@ import {
 import {
   archiveOwnedSweepstake,
   changeSweepstakeTournament,
+  clearSweepstakeKeepyUppyScores,
   createSweepstakeParticipant,
   createSweepstakeParticipantsBulk,
   createOwnedSweepstake,
@@ -622,6 +624,24 @@ export function AppShell({
     }
   }
 
+  async function clearKeepyUppyHighScores() {
+    if (!activeSweepstake) {
+      return;
+    }
+
+    setSaveStatus("Clearing Keepy-Uppy high scores...");
+
+    try {
+      await clearSweepstakeKeepyUppyScores({
+        sweepstakeId: activeSweepstake.id,
+        shareToken: activeSweepstake.shareToken,
+      });
+      setSaveStatus("Keepy-Uppy high score cleared. Shared board now shows 0.");
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
+  }
+
   async function saveParticipantEdit(
     participantId: string,
     field: "name" | "email",
@@ -830,6 +850,7 @@ export function AppShell({
                 onAdminEmailsChange={setAdminEmails}
                 onApplyManualMove={applyManualMove}
                 onBoardVariantChange={changeBoardVariant}
+                onClearKeepyUppyHighScores={clearKeepyUppyHighScores}
                 onCopyShareLink={copyShareLink}
                 onSharedViewModeChange={changeSharedViewMode}
                 onArchiveSweepstake={archiveSweepstakeFromAccount}
@@ -1187,6 +1208,7 @@ function SweepstakeAdminTabs({
   onArchiveSweepstake,
   onBoardVariantChange,
   onBulkParticipantTextChange,
+  onClearKeepyUppyHighScores,
   onCopyShareLink,
   onSharedViewModeChange,
   onDeleteParticipant,
@@ -1236,6 +1258,7 @@ function SweepstakeAdminTabs({
   onArchiveSweepstake: () => void;
   onBoardVariantChange: (variant: BoardVariant) => void;
   onBulkParticipantTextChange: (value: string) => void;
+  onClearKeepyUppyHighScores: () => void;
   onCopyShareLink: () => void;
   onSharedViewModeChange: (mode: SharedViewMode) => void;
   onDeleteParticipant: (participantId: string) => void;
@@ -1313,6 +1336,7 @@ function SweepstakeAdminTabs({
             teamCount={teams.length}
             syncDiagnostics={syncDiagnostics}
             onBoardVariantChange={onBoardVariantChange}
+            onClearKeepyUppyHighScores={onClearKeepyUppyHighScores}
             onCopyShareLink={onCopyShareLink}
             onSharedViewModeChange={onSharedViewModeChange}
           />
@@ -1392,6 +1416,7 @@ function OverviewTab({
   teamCount,
   syncDiagnostics,
   onBoardVariantChange,
+  onClearKeepyUppyHighScores,
   onCopyShareLink,
   onSharedViewModeChange,
 }: {
@@ -1407,6 +1432,7 @@ function OverviewTab({
   teamCount: number;
   syncDiagnostics: SyncDiagnostics | null;
   onBoardVariantChange: (variant: BoardVariant) => void;
+  onClearKeepyUppyHighScores: () => void;
   onCopyShareLink: () => void;
   onSharedViewModeChange: (mode: SharedViewMode) => void;
 }) {
@@ -1528,6 +1554,51 @@ function OverviewTab({
                     Alternative board
                   </Button>
                 </div>
+              </div>
+              <Separator />
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold">
+                    Keepy-Uppy high score
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Clear the shared mini-game table for this sweepstake only.
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      disabled={boardVariant !== "alternative"}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <RotateCcw className="size-4" aria-hidden="true" />
+                      Clear high score
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Clear Keepy-Uppy high score?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This deletes the shared Keepy-Uppy scores for this
+                        sweepstake and resets Hi Score to 0. Official
+                        sweepstake scoring, badges, allocations, and board
+                        settings are not changed.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        onClick={onClearKeepyUppyHighScores}
+                      >
+                        Clear high score
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           ) : null}

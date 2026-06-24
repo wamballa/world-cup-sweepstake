@@ -22,7 +22,11 @@ import {
   buildAlternativeBadgeRows,
   buildAlternativeTeamBoardRows,
 } from "@/features/shared-board/alternative-board-data";
-import type { SharedBoardData } from "@/features/shared-board/shared-board-data";
+import type {
+  SharedBoardData,
+  SharedBoardMatch,
+} from "@/features/shared-board/shared-board-data";
+import type { KeepyUppyScoreboard } from "@/server/keepy-uppy/scores";
 import type { LeaderboardMovementMap } from "@/server/shared-board/leaderboard-snapshot-movement";
 
 import { AiSweepstakeUpdateButton } from "./ai-sweepstake-update-button";
@@ -34,11 +38,13 @@ const headerCellClassName =
 const stickyColumnHeaderClassName = "sticky top-11 z-30 shadow-sm";
 const teamsGridClassName =
   "grid w-full min-w-0 grid-cols-[3.25rem_minmax(0,1.15fr)_minmax(0,1fr)_2rem_2rem_2rem_2.5rem_2.5rem_2.5rem_3.75rem_minmax(0,0.8fr)_minmax(0,1.5fr)] lg:grid-cols-[4rem_minmax(0,1.2fr)_minmax(0,1fr)_2.5rem_2.5rem_2.5rem_3rem_3rem_3rem_4.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)]";
+const heroMatchLimit = 6;
 
 export function AlternativeBoard({
   boardData,
   initialTab = "participants",
   officialMovementByParticipantId,
+  keepyUppyScoreboard,
   shareToken,
 }: {
   boardData: SharedBoardData;
@@ -50,6 +56,7 @@ export function AlternativeBoard({
     | "stats"
     | "explainer";
   officialMovementByParticipantId?: LeaderboardMovementMap;
+  keepyUppyScoreboard?: KeepyUppyScoreboard;
   shareToken?: string;
 }) {
   const leadingParticipant = boardData.standings[0];
@@ -107,10 +114,15 @@ export function AlternativeBoard({
           explainerContent={<AlternativeExplainerPanel />}
           heroAccessory={
             leaderFirstName ? (
-              <LeaderKeepyUppy leaderName={leaderFirstName} />
+              <LeaderKeepyUppy
+                initialScoreboard={keepyUppyScoreboard}
+                leaderName={leaderFirstName}
+                shareToken={shareToken}
+              />
             ) : undefined
           }
           heroLeaderLabel={heroLeaderLabel}
+          heroContent={<TodaysMatchesHero boardData={boardData} />}
           teamsContent={<TeamsTable boardData={boardData} />}
         />
       </CampaignPageStack>
@@ -148,6 +160,124 @@ function formatHeaderFreshnessLabel(freshnessLabel: string) {
   return freshnessLabel
     .replace(/^Checked\s+/, "")
     .replace(/\s+(?:BST|GMT|UTC)$/, "");
+}
+
+function TodaysMatchesHero({ boardData }: { boardData: SharedBoardData }) {
+  const matches = getTodaysHeroMatches(boardData.matches);
+  const visibleMatches = matches.slice(0, heroMatchLimit);
+  const hiddenMatchCount = Math.max(matches.length - visibleMatches.length, 0);
+
+  return (
+    <section className="mt-4 max-w-2xl" aria-label="Today's matches">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs font-black uppercase text-white/75">
+          Today&apos;s matches
+        </p>
+        {hiddenMatchCount > 0 ? (
+          <p className="rounded-full bg-white px-3 py-1 text-xs font-black text-campaign-purple shadow-sm">
+            +{hiddenMatchCount} more in Matches
+          </p>
+        ) : null}
+      </div>
+      {visibleMatches.length > 0 ? (
+        <>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {visibleMatches.map((match) => (
+              <div
+                className="rounded-xl bg-white/15 px-3 py-2 text-white ring-1 ring-white/20"
+                key={match.id}
+              >
+                <p className="truncate text-sm font-black">
+                  {match.homeTeamName} v {match.awayTeamName}
+                </p>
+                <p className="mt-1 truncate text-xs font-semibold text-white/80">
+                  {match.participantLabel}
+                </p>
+                <p className="mt-1">
+                  <span className={getHeroMatchDetailClassName(match)}>
+                    {formatHeroMatchDetail(match)}
+                  </span>
+                </p>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="mt-2 rounded-xl bg-white/15 px-3 py-2 text-sm font-semibold text-white/85 ring-1 ring-white/20">
+          No matches scheduled today.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function getTodaysHeroMatches(matches: SharedBoardMatch[]) {
+  const datedMatches = matches
+    .filter((match) => match.kickoffAt)
+    .sort(sortHeroMatches);
+  const todayKey = formatUkDateKey(new Date());
+  const todaysMatches = datedMatches.filter(
+    (match) => match.kickoffAt && formatUkDateKey(match.kickoffAt) === todayKey,
+  );
+
+  if (todaysMatches.length > 0) {
+    return todaysMatches;
+  }
+
+  const nextMatch = datedMatches.find(
+    (match) => match.kickoffAt && new Date(match.kickoffAt).getTime() >= Date.now(),
+  );
+
+  return nextMatch ? [nextMatch] : [];
+}
+
+function sortHeroMatches(a: SharedBoardMatch, b: SharedBoardMatch) {
+  return (
+    new Date(a.kickoffAt ?? 0).getTime() -
+      new Date(b.kickoffAt ?? 0).getTime() ||
+    a.homeTeamName.localeCompare(b.homeTeamName)
+  );
+}
+
+function formatUkDateKey(date: Date | string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/London",
+    year: "numeric",
+  }).format(new Date(date));
+}
+
+function formatHeroMatchDetail(match: SharedBoardMatch) {
+  if (
+    match.status === "final" &&
+    match.homeScore != null &&
+    match.awayScore != null
+  ) {
+    return `${match.homeScore}-${match.awayScore}`;
+  }
+
+  if (match.status === "scheduled") {
+    return match.kickoffLabel;
+  }
+
+  return formatHeroMatchStatus(match.status);
+}
+
+function getHeroMatchDetailClassName(match: SharedBoardMatch) {
+  if (
+    match.status === "final" &&
+    match.homeScore != null &&
+    match.awayScore != null
+  ) {
+    return "inline-flex rounded-full bg-white px-2 py-0.5 text-xs font-black text-campaign-purple-strong shadow-sm";
+  }
+
+  return "text-xs font-black uppercase text-campaign-yellow";
+}
+
+function formatHeroMatchStatus(status: SharedBoardMatch["status"]) {
+  return status.replace(/_/g, " ");
 }
 
 const alternativeScoringRows = [

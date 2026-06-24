@@ -201,6 +201,24 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["leaderboard_snapshot_rows"]["Insert"]>;
       };
+      keepy_uppy_scores: {
+        Row: {
+          id: string;
+          sweepstake_id: string;
+          player_name: string;
+          score: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          sweepstake_id: string;
+          player_name: string;
+          score: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["keepy_uppy_scores"]["Insert"]>;
+        Relationships: [];
+      };
       participants: {
         Row: {
           id: string;

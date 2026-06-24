@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { SharedBoardData } from "@/features/shared-board/shared-board-data";
@@ -33,6 +33,17 @@ beforeAll(() => {
 
 beforeEach(() => {
   window.localStorage.clear();
+  mockKeepyUppyFetch({
+    highScore: 11,
+    scores: [
+      {
+        id: "score-1",
+        playerName: "Maya",
+        score: 11,
+        createdAt: "2026-06-22T10:00:00.000Z",
+      },
+    ],
+  });
 });
 
 describe("AlternativeBoard", () => {
@@ -51,12 +62,130 @@ describe("AlternativeBoard", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("Last Updated")).toBeInTheDocument();
     expect(screen.getByText("17 Jun 2026, 12:00")).toBeInTheDocument();
+    expect(screen.getByText("Today's matches")).toBeInTheDocument();
+    expect(screen.queryByText(/Cached tournament data/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Scores may be delayed by the data provider."),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByText("Checked 17 Jun 2026, 12:00 BST"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Updates")).not.toBeInTheDocument();
     expect(screen.queryByText("Views")).not.toBeInTheDocument();
     expect(screen.queryByText("6 tabs")).not.toBeInTheDocument();
+  });
+
+  it("shows today's UK-date matches in the Alternative Board hero", () => {
+    const data = boardData();
+    const todayIso = new Date().toISOString();
+
+    data.matches = [
+      {
+        ...data.matches[0],
+        kickoffAt: todayIso,
+        kickoffLabel: "Today, 12:00",
+        status: "scheduled",
+      },
+      {
+        ...data.matches[1],
+        kickoffAt: new Date(Date.now() + 86_400_000).toISOString(),
+        kickoffLabel: "Tomorrow, 20:00",
+        status: "scheduled",
+      },
+    ];
+
+    renderAlternativeBoard(<AlternativeBoard boardData={data} />);
+
+    const heroToday = screen.getByLabelText("Today's matches");
+
+    expect(within(heroToday).getByText("Japan v Norway")).toBeInTheDocument();
+    expect(within(heroToday).getByText("Andy & Jobin")).toBeInTheDocument();
+    expect(within(heroToday).getByText("Today, 12:00")).toBeInTheDocument();
+    expect(
+      within(heroToday).queryByText("Japan v Scotland"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows up to six hero matches before pointing to the full Matches tab", () => {
+    const data = boardData();
+    const todayIso = new Date().toISOString();
+
+    data.matches = Array.from({ length: 7 }, (_, index) => ({
+      ...data.matches[0],
+      id: `today-match-${index + 1}`,
+      homeTeamName: `Home ${index + 1}`,
+      awayTeamName: `Away ${index + 1}`,
+      kickoffAt: todayIso,
+      kickoffLabel: `Today, ${String(12 + index).padStart(2, "0")}:00`,
+      status: "scheduled",
+    }));
+
+    renderAlternativeBoard(<AlternativeBoard boardData={data} />);
+
+    const heroToday = screen.getByLabelText("Today's matches");
+
+    expect(within(heroToday).getByText("Home 1 v Away 1")).toBeInTheDocument();
+    expect(within(heroToday).getByText("Home 6 v Away 6")).toBeInTheDocument();
+    expect(
+      within(heroToday).queryByText("Home 7 v Away 7"),
+    ).not.toBeInTheDocument();
+    expect(within(heroToday).getByText("+1 more in Matches")).toHaveClass(
+      "rounded-full",
+      "bg-white",
+    );
+  });
+
+  it("shows completed match scores in the Alternative Board hero", () => {
+    const data = boardData();
+
+    data.matches = [
+      {
+        ...data.matches[0],
+        kickoffAt: new Date().toISOString(),
+        kickoffLabel: "Today, 12:00",
+        status: "final",
+        homeScore: 2,
+        awayScore: 1,
+      },
+    ];
+
+    renderAlternativeBoard(<AlternativeBoard boardData={data} />);
+
+    const heroToday = screen.getByLabelText("Today's matches");
+
+    expect(within(heroToday).getByText("Japan v Norway")).toBeInTheDocument();
+    expect(within(heroToday).getByText("2-1")).toHaveClass(
+      "bg-white",
+      "text-campaign-purple-strong",
+    );
+    expect(within(heroToday).queryByText("final")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the next upcoming match when the Alternative Board has no matches today", () => {
+    const data = boardData();
+
+    data.matches = [
+      {
+        ...data.matches[0],
+        kickoffAt: new Date(Date.now() - 86_400_000).toISOString(),
+        kickoffLabel: "Yesterday, 12:00",
+        status: "final",
+      },
+      {
+        ...data.matches[1],
+        kickoffAt: new Date(Date.now() + 86_400_000).toISOString(),
+        kickoffLabel: "Tomorrow, 20:00",
+        status: "scheduled",
+      },
+    ];
+
+    renderAlternativeBoard(<AlternativeBoard boardData={data} />);
+
+    const heroToday = screen.getByLabelText("Today's matches");
+
+    expect(within(heroToday).getByText("Japan v Scotland")).toBeInTheDocument();
+    expect(within(heroToday).getByText("Tomorrow, 20:00")).toBeInTheDocument();
+    expect(within(heroToday).queryByText("Japan v Norway")).not.toBeInTheDocument();
   });
 
   it("shows the AI update button when a share token is provided", () => {
@@ -206,16 +335,220 @@ describe("AlternativeBoard", () => {
   });
 
   it("shows the keepy-uppy accessory with the hidden board leader first name", () => {
-    renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
+    renderAlternativeBoard(
+      <AlternativeBoard
+        boardData={boardData()}
+        keepyUppyScoreboard={{
+          highScore: 9,
+          scores: [
+            {
+              id: "score-1",
+              playerName: "Ava",
+              score: 9,
+              createdAt: "2026-06-22T10:00:00.000Z",
+            },
+          ],
+        }}
+      />,
+    );
 
     const keepyUppy = screen.getByTestId("leader-keepy-uppy");
+    const keepyUppyFrame = screen.getByTestId("keepy-uppy-frame");
 
     expect(keepyUppy).toBeInTheDocument();
+    expect(keepyUppyFrame).toHaveClass(
+      "bg-[radial-gradient(circle_at_22%_18%,rgba(255,255,255,0.24),rgba(255,255,255,0.08)_34%,rgba(77,20,125,0.36)_72%,rgba(239,0,86,0.32))]",
+    );
+    expect(keepyUppyFrame).toHaveClass("lg:h-[19.75rem]");
+    expect(keepyUppyFrame).not.toHaveClass("bg-white/15");
+    expect(keepyUppyFrame.querySelector("canvas")).toBeNull();
     expect(
       screen.getByLabelText("Andy's keepy-uppy challenge"),
     ).toBeInTheDocument();
-    expect(within(keepyUppy).getByText("Andy")).toBeInTheDocument();
-    expect(within(keepyUppy).getByText("Keep-ups 0 · Best 0")).toBeInTheDocument();
+    expect(within(keepyUppy).getByText("Keepy Uppy")).toBeInTheDocument();
+    expect(within(keepyUppy).getByText("Challenge")).toBeInTheDocument();
+    expect(within(keepyUppy).queryByText("Andy")).not.toBeInTheDocument();
+    expect(within(keepyUppy).getByText("Keep-ups 0")).toBeInTheDocument();
+    expect(
+      within(keepyUppy).getByRole("button", { name: "Hi Score 9" }),
+    ).toBeInTheDocument();
+    expect(
+      within(keepyUppyFrame).getByRole("button", { name: "Hi Score 9" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the keepy-uppy high-score dialog from the hero pill", async () => {
+    renderAlternativeBoard(
+      <AlternativeBoard
+        boardData={boardData()}
+        keepyUppyScoreboard={{
+          highScore: 9,
+          scores: [
+            {
+              id: "score-1",
+              playerName: "Ava",
+              score: 9,
+              createdAt: "2026-06-22T10:00:00.000Z",
+            },
+          ],
+        }}
+        shareToken="real-token"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Hi Score 9" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("dialog", { name: "Keepy-uppy high scores" }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Maya")).toBeInTheDocument();
+    expect(screen.getByText("11")).toBeInTheDocument();
+  });
+
+  it("asks for a player name when a completed streak beats the high score", async () => {
+    mockKeepyUppyFetch({
+      highScore: 0,
+      scores: [],
+    });
+    renderAlternativeBoard(
+      <AlternativeBoard
+        boardData={boardData()}
+        keepyUppyScoreboard={{
+          highScore: 0,
+          scores: [],
+        }}
+        shareToken="real-token"
+      />,
+    );
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Keep Andy's ball up" }),
+      {
+        clientX: 224,
+        clientY: 142,
+      },
+    );
+
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole("dialog", { name: "New high score" }),
+        ).toBeInTheDocument(),
+      { timeout: 1500 },
+    );
+    expect(screen.getByLabelText("Player name")).toBeInTheDocument();
+  });
+
+  it("asks for a player name when a completed streak makes the top 10", async () => {
+    mockKeepyUppyFetch({
+      highScore: 6,
+      scores: [
+        {
+          id: "score-1",
+          playerName: "Ava",
+          score: 6,
+          createdAt: "2026-06-22T10:00:00.000Z",
+        },
+      ],
+    });
+    renderAlternativeBoard(
+      <AlternativeBoard
+        boardData={boardData()}
+        keepyUppyScoreboard={{
+          highScore: 6,
+          scores: [
+            {
+              id: "score-1",
+              playerName: "Ava",
+              score: 6,
+              createdAt: "2026-06-22T10:00:00.000Z",
+            },
+          ],
+        }}
+        shareToken="real-token"
+      />,
+    );
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Keep Andy's ball up" }),
+      {
+        clientX: 224,
+        clientY: 142,
+      },
+    );
+
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole("dialog", { name: "You made the top 10" }),
+        ).toBeInTheDocument(),
+      { timeout: 1500 },
+    );
+    expect(screen.getByLabelText("Player name")).toBeInTheDocument();
+  });
+
+  it("shows the top 10 when a completed streak misses the table", async () => {
+    mockKeepyUppyFetch(fullKeepyUppyScoreboard());
+    renderAlternativeBoard(
+      <AlternativeBoard
+        boardData={boardData()}
+        keepyUppyScoreboard={fullKeepyUppyScoreboard()}
+        shareToken="real-token"
+      />,
+    );
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Keep Andy's ball up" }),
+      {
+        clientX: 224,
+        clientY: 142,
+      },
+    );
+
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole("dialog", { name: "Sorry, you didn't make it" }),
+        ).toBeInTheDocument(),
+      { timeout: 1500 },
+    );
+    const missDialog = screen.getByRole("dialog", {
+      name: "Sorry, you didn't make it",
+    });
+
+    expect(within(missDialog).getByText("Player 10")).toBeInTheDocument();
+    expect(within(missDialog).getByText("2")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "New high score" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not show a keepy-uppy modal for a zero streak", async () => {
+    mockKeepyUppyFetch(fullKeepyUppyScoreboard());
+    renderAlternativeBoard(
+      <AlternativeBoard
+        boardData={boardData()}
+        keepyUppyScoreboard={fullKeepyUppyScoreboard()}
+        shareToken="real-token"
+      />,
+    );
+
+    await waitFor(
+      () => {
+        expect(
+          screen.queryByRole("dialog", { name: "Sorry, you didn't make it" }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("dialog", { name: "New high score" }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("dialog", { name: "You made the top 10" }),
+        ).not.toBeInTheDocument();
+      },
+      { timeout: 800 },
+    );
   });
 
   it("hides the keepy-uppy accessory when no leader first name is available", () => {
@@ -384,6 +717,10 @@ describe("AlternativeBoard", () => {
     );
 
     expect(screen.getByText("Official current leader.")).toBeInTheDocument();
+    expect(screen.getByText(/Cached tournament data/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Scores may be delayed by the data provider."),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Andy (Japan)")).not.toBeInTheDocument();
     expect(screen.queryByTestId("leader-keepy-uppy")).not.toBeInTheDocument();
   });
@@ -454,6 +791,30 @@ describe("getFirstName", () => {
 
 function renderAlternativeBoard(ui: ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
+}
+
+function mockKeepyUppyFetch(scoreboard: {
+  highScore: number;
+  scores: Array<{
+    id: string;
+    playerName: string;
+    score: number;
+    createdAt: string;
+  }>;
+}) {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json(scoreboard)));
+}
+
+function fullKeepyUppyScoreboard() {
+  return {
+    highScore: 11,
+    scores: Array.from({ length: 10 }, (_, index) => ({
+      id: `score-${index + 1}`,
+      playerName: `Player ${index + 1}`,
+      score: index === 9 ? 2 : 11 - index,
+      createdAt: `2026-06-22T10:${String(index).padStart(2, "0")}:00.000Z`,
+    })),
+  };
 }
 
 function boardData(): SharedBoardData {

@@ -27,6 +27,13 @@ The product may take broad inspiration from Playdrawr-style sweepstake setup sim
 - Vitest
 - Playwright
 
+## Environment And Tooling
+
+- The project currently uses one managed Supabase project/database configured through `.env.local`; there is no local Supabase database or `supabase/config.toml` in this workspace.
+- Do not assume `supabase db reset` or local Supabase commands are available or appropriate.
+- New Supabase migrations in `/supabase/migrations` must be applied to the single configured Supabase project before code that depends on them will run.
+- When diagnosing runtime Supabase errors, first check whether the remote database schema is behind the repository migrations.
+
 ## Working Principles
 
 - Plan before building.
@@ -38,8 +45,19 @@ The product may take broad inspiration from Playdrawr-style sweepstake setup sim
 - Record important decisions in `/planning/decision-log.md`.
 - Track unresolved questions in `/planning/open-questions.md`.
 - Track work items and phase sequencing only in `/backlog.md`.
-- Read relevant files in `/docs`, `/planning`, and `/agents` before making decisions.
+- Read only the smallest relevant set of files needed for the task; consult `/docs`, `/planning`, and `/agents` only when the requested work touches that area or depends on those decisions.
 - For visual design work, read `/docs/bl-091-visual-direction.md` and preserve its approved high-energy direction unless a later decision supersedes it.
+
+## Context Budget Rules
+
+- Do not scan the whole repository by default.
+- Inspect only the smallest set of files needed for the requested change.
+- Prefer targeted file reads over broad searches.
+- Do not inspect dependency, build, or config files unless the task is explicitly about tooling, runtime setup, SDK versions, dependencies, or a build error.
+- Do not inspect test folders unless the task is about tests, a failing test, or implementation requires test updates.
+- Do not inspect generated or build output folders such as `.next`, `node_modules`, `dist`, `build`, or coverage output unless required for diagnosis.
+- If a task is ambiguous, ask for clarification or propose a narrow inspection plan before reading many files.
+- In implementation mode, keep diffs focused and summarize exactly which files changed.
 
 ## Product Rules
 

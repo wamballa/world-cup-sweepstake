@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CountdownPage } from "@/features/sweepstake-demo/countdown-page";
 import { AlternativeBoard } from "@/features/sweepstake-demo/alternative-board";
 import { ParticipantBoard } from "@/features/sweepstake-demo/participant-board";
+import { getKeepyUppyScoreboardForSweepstake } from "@/server/keepy-uppy/scores";
 import { loadSharedBoardByShareToken } from "@/server/shared-board/load-shared-board";
 import { loadLatestLeaderboardSnapshotMovement } from "@/server/shared-board/leaderboard-snapshot-movement";
 import { createPreviewSharedBoardData } from "@/server/shared-board/preview-shared-board";
@@ -36,13 +37,15 @@ export default async function SharedSweepstakePage({
   }
 
   if (boardData.boardVariant === "alternative") {
-    const movement = await loadLatestLeaderboardSnapshotMovement(
-      boardData.sweepstakeId,
-    );
+    const [movement, keepyUppyScoreboard] = await Promise.all([
+      loadLatestLeaderboardSnapshotMovement(boardData.sweepstakeId),
+      getKeepyUppyScoreboardForSweepstake(boardData.sweepstakeId),
+    ]);
 
     return (
       <AlternativeBoard
         boardData={boardData}
+        keepyUppyScoreboard={keepyUppyScoreboard}
         officialMovementByParticipantId={movement.officialMovementByParticipantId}
         shareToken={shareToken}
       />

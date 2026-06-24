@@ -32,6 +32,8 @@ npm install
 npm run dev
 ```
 
+This workspace is configured to use one managed Supabase project via `.env.local`. There is no local Supabase database/config in the repo. Apply pending SQL files from `/supabase/migrations` to that configured Supabase project before running code that depends on new tables or columns.
+
 Quality checks:
 
 ```bash

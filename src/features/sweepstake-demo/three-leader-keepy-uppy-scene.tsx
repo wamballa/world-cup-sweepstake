@@ -22,6 +22,7 @@ export function ThreeLeaderKeepyUppyScene({
       camera={{ position: [0, 0.45, 5], fov: 38 }}
       className="pointer-events-none absolute inset-0"
       dpr={[1, 1.5]}
+      style={{ background: "transparent" }}
       gl={{
         antialias: true,
         alpha: true,
@@ -30,6 +31,7 @@ export function ThreeLeaderKeepyUppyScene({
       }}
       onCreated={({ gl }) => {
         gl.setClearColor(0x000000, 0);
+        gl.domElement.style.background = "transparent";
       }}
     >
       <ambientLight intensity={1.4} />

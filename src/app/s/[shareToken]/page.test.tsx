@@ -20,15 +20,22 @@ vi.mock("@/features/sweepstake-demo/countdown-page", () => ({
 vi.mock("@/features/sweepstake-demo/alternative-board", () => ({
   AlternativeBoard: ({
     boardData,
+    keepyUppyScoreboard,
     officialMovementByParticipantId,
     shareToken,
   }: {
     boardData: SharedBoardData;
+    keepyUppyScoreboard?: unknown;
     officialMovementByParticipantId?: Record<string, string>;
     shareToken?: string;
   }) => ({
     type: "AlternativeBoard",
-    props: { boardData, officialMovementByParticipantId, shareToken },
+    props: {
+      boardData,
+      keepyUppyScoreboard,
+      officialMovementByParticipantId,
+      shareToken,
+    },
     key: null,
   }),
 }));
@@ -63,6 +70,21 @@ const loadLatestLeaderboardSnapshotMovement = vi.fn(
 vi.mock("@/server/shared-board/leaderboard-snapshot-movement", () => ({
   loadLatestLeaderboardSnapshotMovement: (sweepstakeId: string) =>
     loadLatestLeaderboardSnapshotMovement(sweepstakeId),
+}));
+
+const getKeepyUppyScoreboardForSweepstake = vi.fn(
+  async (sweepstakeId: string) => {
+    void sweepstakeId;
+
+    return {
+      highScore: 12,
+      scores: [],
+    };
+  },
+);
+vi.mock("@/server/keepy-uppy/scores", () => ({
+  getKeepyUppyScoreboardForSweepstake: (sweepstakeId: string) =>
+    getKeepyUppyScoreboardForSweepstake(sweepstakeId),
 }));
 
 vi.mock("@/server/shared-board/preview-shared-board", () => ({
@@ -107,6 +129,13 @@ describe("shared sweepstake route board variant", () => {
     expect(loadLatestLeaderboardSnapshotMovement).toHaveBeenCalledWith(
       "sweepstake-1",
     );
+    expect(getKeepyUppyScoreboardForSweepstake).toHaveBeenCalledWith(
+      "sweepstake-1",
+    );
+    expect(page.props.keepyUppyScoreboard).toEqual({
+      highScore: 12,
+      scores: [],
+    });
     expect(page.props.officialMovementByParticipantId).toEqual({ maya: "+1" });
   });
 
