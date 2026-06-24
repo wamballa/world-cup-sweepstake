@@ -12,10 +12,12 @@ import {
   LogOut,
   Mail,
   Plus,
+  RotateCcw,
   Settings,
   Share2,
   ShieldCheck,
   Shuffle,
+  Sparkles,
   Trophy,
   Users,
 } from "lucide-react";
@@ -62,13 +64,16 @@ import {
 import {
   archiveOwnedSweepstake,
   changeSweepstakeTournament,
+  clearSweepstakeKeepyUppyScores,
   createSweepstakeParticipant,
   createSweepstakeParticipantsBulk,
   createOwnedSweepstake,
   deleteSweepstakeParticipant,
   saveSweepstakeAllocation,
+  saveSweepstakeBoardVariant,
   saveSweepstakeSharedViewMode,
   saveSweepstakeSettings,
+  rewriteSweepstakeAiNarrative,
   updateSweepstakeParticipant,
 } from "@/app/admin/actions";
 import {
@@ -112,6 +117,7 @@ const manualFutureBadges = [
 type AdminScreen = "dashboard" | "setup" | "sweepstake";
 type AdminTab = "overview" | "participants" | "draw" | "settings";
 type SharedViewMode = "participant_board" | "countdown";
+type BoardVariant = "official" | "alternative";
 
 type AdminIdentity = {
   displayName: string;
@@ -125,6 +131,7 @@ export type AccountSweepstake = {
   tournamentCode: string;
   tournamentLabel: string;
   sharedViewMode: SharedViewMode;
+  boardVariant: BoardVariant;
   isOwner: boolean;
   participants: ParticipantDraft[];
   adminEmails: string;
@@ -176,12 +183,16 @@ export function AppShell({
   const [sharedViewMode, setSharedViewMode] = useState<SharedViewMode>(
     activeSweepstake?.sharedViewMode ?? "participant_board",
   );
+  const [boardVariant, setBoardVariant] = useState<BoardVariant>(
+    activeSweepstake?.boardVariant ?? "official",
+  );
   const [moveTeamId, setMoveTeamId] = useState(
     activeSweepstake?.teams[0]?.id ?? "",
   );
   const [moveParticipantId, setMoveParticipantId] = useState("");
   const [shareCopied, setShareCopied] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
+  const [isRewritingAi, setIsRewritingAi] = useState(false);
   const teams = activeSweepstake?.teams ?? [];
 
   const duplicateNames = useMemo(
@@ -219,6 +230,7 @@ export function AppShell({
     setAllocations(sweepstake.allocations);
     setAuditEvents(sweepstake.auditEvents);
     setSharedViewMode(sweepstake.sharedViewMode);
+    setBoardVariant(sweepstake.boardVariant);
     setMoveTeamId(sweepstake.allocations[0]?.teamId ?? sweepstake.teams[0]?.id ?? "");
     setMoveParticipantId(
       sweepstake.allocations[0]?.participantId ??
@@ -250,6 +262,7 @@ export function AppShell({
     setAllocations([]);
     setAuditEvents([]);
     setSharedViewMode(createdSweepstake.sharedViewMode);
+    setBoardVariant(createdSweepstake.boardVariant);
     setMoveTeamId(createdSweepstake.teams[0]?.id ?? "");
     setMoveParticipantId("");
     setSaveStatus("Sweepstake saved to your account.");
@@ -580,6 +593,55 @@ export function AppShell({
     }
   }
 
+  async function changeBoardVariant(nextVariant: BoardVariant) {
+    if (!activeSweepstake) {
+      return;
+    }
+
+    setSaveStatus("Updating main board UI...");
+
+    try {
+      await saveSweepstakeBoardVariant({
+        sweepstakeId: activeSweepstake.id,
+        boardVariant: nextVariant,
+        shareToken: activeSweepstake.shareToken,
+      });
+      setBoardVariant(nextVariant);
+      setSweepstakes((current) =>
+        current.map((sweepstake) =>
+          sweepstake.id === activeSweepstake.id
+            ? { ...sweepstake, boardVariant: nextVariant }
+            : sweepstake,
+        ),
+      );
+      setSaveStatus(
+        nextVariant === "alternative"
+          ? "Shared link now opens the Alternative board UI."
+          : "Shared link now opens the Official board UI.",
+      );
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
+  }
+
+  async function clearKeepyUppyHighScores() {
+    if (!activeSweepstake) {
+      return;
+    }
+
+    setSaveStatus("Clearing Keepy-Uppy high scores...");
+
+    try {
+      await clearSweepstakeKeepyUppyScores({
+        sweepstakeId: activeSweepstake.id,
+        shareToken: activeSweepstake.shareToken,
+      });
+      setSaveStatus("Keepy-Uppy high score cleared. Shared board now shows 0.");
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    }
+  }
+
   async function saveParticipantEdit(
     participantId: string,
     field: "name" | "email",
@@ -653,6 +715,28 @@ export function AppShell({
     setSaveStatus("Settings saved to your account.");
   }
 
+  async function rewriteAiNarrative() {
+    if (!activeSweepstake || isRewritingAi) {
+      return;
+    }
+
+    setIsRewritingAi(true);
+    setSaveStatus("Rewriting the AI narrative...");
+
+    try {
+      await rewriteSweepstakeAiNarrative({
+        sweepstakeId: activeSweepstake.id,
+      });
+      setSaveStatus(
+        "AI narrative rewritten. Participants will see it the next time the Agent checks for an update.",
+      );
+    } catch (error) {
+      setSaveStatus(getActionErrorMessage(error));
+    } finally {
+      setIsRewritingAi(false);
+    }
+  }
+
   async function archiveSweepstakeFromAccount() {
     if (!activeSweepstake || !activeSweepstake.isOwner) {
       return;
@@ -682,6 +766,7 @@ export function AppShell({
     setAllocations([]);
     setAuditEvents([]);
     setSharedViewMode("participant_board");
+    setBoardVariant("official");
     setMoveTeamId("");
     setMoveParticipantId("");
     setSaveStatus("Sweepstake archived. Its shared link is now inactive.");
@@ -745,8 +830,10 @@ export function AppShell({
                 participants={participants}
                 shareCopied={shareCopied}
                 shareLink={shareLink}
+                boardVariant={boardVariant}
                 sharedViewMode={sharedViewMode}
                 isOwner={activeSweepstake?.isOwner ?? false}
+                isRewritingAi={isRewritingAi}
                 saveStatus={saveStatus}
                 spread={spread}
                 sweepstakeName={sweepstakeName}
@@ -762,6 +849,8 @@ export function AppShell({
                 onAddBulkParticipants={addBulkParticipants}
                 onAdminEmailsChange={setAdminEmails}
                 onApplyManualMove={applyManualMove}
+                onBoardVariantChange={changeBoardVariant}
+                onClearKeepyUppyHighScores={clearKeepyUppyHighScores}
                 onCopyShareLink={copyShareLink}
                 onSharedViewModeChange={changeSharedViewMode}
                 onArchiveSweepstake={archiveSweepstakeFromAccount}
@@ -774,6 +863,7 @@ export function AppShell({
                 onParticipantNameDraftChange={setParticipantName}
                 onSaveParticipantEdit={saveParticipantEdit}
                 onRunAllocation={runAllocation}
+                onRewriteAiNarrative={rewriteAiNarrative}
                 onSaveSettings={saveSettingsToAccount}
                 onSweepstakeNameChange={setSweepstakeName}
                 onTournamentChange={changeTournamentYear}
@@ -1088,6 +1178,7 @@ function SweepstakeAdminTabs({
   adminEmails,
   allocations,
   auditEvents,
+  boardVariant,
   canAllocate,
   duplicateNames,
   emailCount,
@@ -1102,6 +1193,7 @@ function SweepstakeAdminTabs({
   shareLink,
   sharedViewMode,
   isOwner,
+  isRewritingAi,
   saveStatus,
   spread,
   sweepstakeName,
@@ -1114,7 +1206,9 @@ function SweepstakeAdminTabs({
   onAdminEmailsChange,
   onApplyManualMove,
   onArchiveSweepstake,
+  onBoardVariantChange,
   onBulkParticipantTextChange,
+  onClearKeepyUppyHighScores,
   onCopyShareLink,
   onSharedViewModeChange,
   onDeleteParticipant,
@@ -1125,6 +1219,7 @@ function SweepstakeAdminTabs({
   onParticipantNameDraftChange,
   onSaveParticipantEdit,
   onRunAllocation,
+  onRewriteAiNarrative,
   onSaveSettings,
   onSweepstakeNameChange,
   onTournamentChange,
@@ -1133,6 +1228,7 @@ function SweepstakeAdminTabs({
   adminEmails: string;
   allocations: TeamAllocation[];
   auditEvents: AllocationAudit[];
+  boardVariant: BoardVariant;
   canAllocate: boolean;
   duplicateNames: string[];
   emailCount: number;
@@ -1147,6 +1243,7 @@ function SweepstakeAdminTabs({
   shareLink: string;
   sharedViewMode: SharedViewMode;
   isOwner: boolean;
+  isRewritingAi: boolean;
   saveStatus: string;
   spread: { min: number; max: number };
   sweepstakeName: string;
@@ -1159,7 +1256,9 @@ function SweepstakeAdminTabs({
   onAdminEmailsChange: (value: string) => void;
   onApplyManualMove: () => void;
   onArchiveSweepstake: () => void;
+  onBoardVariantChange: (variant: BoardVariant) => void;
   onBulkParticipantTextChange: (value: string) => void;
+  onClearKeepyUppyHighScores: () => void;
   onCopyShareLink: () => void;
   onSharedViewModeChange: (mode: SharedViewMode) => void;
   onDeleteParticipant: (participantId: string) => void;
@@ -1178,6 +1277,7 @@ function SweepstakeAdminTabs({
     value: string,
   ) => void;
   onRunAllocation: (action: "initial-draw" | "rerun") => void;
+  onRewriteAiNarrative: () => void;
   onSaveSettings: () => void;
   onSweepstakeNameChange: (value: string) => void;
   onTournamentChange: (tournamentCode: string) => void;
@@ -1230,10 +1330,13 @@ function SweepstakeAdminTabs({
             participantCount={participants.length}
             shareCopied={shareCopied}
             shareLink={shareLink}
+            boardVariant={boardVariant}
             sharedViewMode={sharedViewMode}
             spreadLabel={`${spread.min}-${spread.max}`}
             teamCount={teams.length}
             syncDiagnostics={syncDiagnostics}
+            onBoardVariantChange={onBoardVariantChange}
+            onClearKeepyUppyHighScores={onClearKeepyUppyHighScores}
             onCopyShareLink={onCopyShareLink}
             onSharedViewModeChange={onSharedViewModeChange}
           />
@@ -1283,11 +1386,13 @@ function SweepstakeAdminTabs({
           <SettingsTab
             adminEmails={adminEmails}
             isOwner={isOwner}
+            isRewritingAi={isRewritingAi}
             sweepstakeName={sweepstakeName}
             teamCount={teams.length}
             tournamentCode={tournamentCode}
             onArchiveSweepstake={onArchiveSweepstake}
             onAdminEmailsChange={onAdminEmailsChange}
+            onRewriteAiNarrative={onRewriteAiNarrative}
             onSaveSettings={onSaveSettings}
             onSweepstakeNameChange={onSweepstakeNameChange}
             onTournamentChange={onTournamentChange}
@@ -1301,6 +1406,7 @@ function SweepstakeAdminTabs({
 function OverviewTab({
   allocationCount,
   auditEventCount,
+  boardVariant,
   emailCount,
   participantCount,
   shareCopied,
@@ -1309,11 +1415,14 @@ function OverviewTab({
   spreadLabel,
   teamCount,
   syncDiagnostics,
+  onBoardVariantChange,
+  onClearKeepyUppyHighScores,
   onCopyShareLink,
   onSharedViewModeChange,
 }: {
   allocationCount: number;
   auditEventCount: number;
+  boardVariant: BoardVariant;
   emailCount: number;
   participantCount: number;
   shareCopied: boolean;
@@ -1322,6 +1431,8 @@ function OverviewTab({
   spreadLabel: string;
   teamCount: number;
   syncDiagnostics: SyncDiagnostics | null;
+  onBoardVariantChange: (variant: BoardVariant) => void;
+  onClearKeepyUppyHighScores: () => void;
   onCopyShareLink: () => void;
   onSharedViewModeChange: (mode: SharedViewMode) => void;
 }) {
@@ -1382,7 +1493,7 @@ function OverviewTab({
             </Button>
           </div>
           {allocationCount > 0 ? (
-            <div className="rounded-lg border bg-surface-muted p-3">
+            <div className="space-y-3 rounded-lg border bg-surface-muted p-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-sm font-semibold">Shared link display</p>
@@ -1412,6 +1523,82 @@ function OverviewTab({
                     Countdown page
                   </Button>
                 </div>
+              </div>
+              <Separator />
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Main board UI</p>
+                  <p className="text-xs text-muted-foreground">
+                    Choose the board shown on the normal shared URL.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    aria-pressed={boardVariant === "official"}
+                    onClick={() => onBoardVariantChange("official")}
+                    size="sm"
+                    variant={boardVariant === "official" ? "default" : "outline"}
+                  >
+                    <LayoutDashboard className="size-4" aria-hidden="true" />
+                    Official board
+                  </Button>
+                  <Button
+                    aria-pressed={boardVariant === "alternative"}
+                    onClick={() => onBoardVariantChange("alternative")}
+                    size="sm"
+                    variant={
+                      boardVariant === "alternative" ? "default" : "outline"
+                    }
+                  >
+                    <BarChart3 className="size-4" aria-hidden="true" />
+                    Alternative board
+                  </Button>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold">
+                    Keepy-Uppy high score
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Clear the shared mini-game table for this sweepstake only.
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      disabled={boardVariant !== "alternative"}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <RotateCcw className="size-4" aria-hidden="true" />
+                      Clear high score
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Clear Keepy-Uppy high score?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This deletes the shared Keepy-Uppy scores for this
+                        sweepstake and resets Hi Score to 0. Official
+                        sweepstake scoring, badges, allocations, and board
+                        settings are not changed.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        onClick={onClearKeepyUppyHighScores}
+                      >
+                        Clear high score
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           ) : null}
@@ -1709,22 +1896,26 @@ function ParticipantsTab({
 function SettingsTab({
   adminEmails,
   isOwner,
+  isRewritingAi,
   sweepstakeName,
   teamCount,
   tournamentCode,
   onArchiveSweepstake,
   onAdminEmailsChange,
+  onRewriteAiNarrative,
   onSaveSettings,
   onSweepstakeNameChange,
   onTournamentChange,
 }: {
   adminEmails: string;
   isOwner: boolean;
+  isRewritingAi: boolean;
   sweepstakeName: string;
   teamCount: number;
   tournamentCode: string;
   onArchiveSweepstake: () => void;
   onAdminEmailsChange: (value: string) => void;
+  onRewriteAiNarrative: () => void;
   onSaveSettings: () => void;
   onSweepstakeNameChange: (value: string) => void;
   onTournamentChange: (tournamentCode: string) => void;
@@ -1835,6 +2026,51 @@ function SettingsTab({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="size-4 text-primary" aria-hidden="true" />
+            AI Agent narrative
+          </CardTitle>
+          <CardDescription>
+            Normal page refreshes and Agent opens reuse the cached narrative.
+            Use this only when you want a fresh rewrite from the same stored
+            sweepstake facts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button disabled={isRewritingAi} variant="outline">
+                <Sparkles className="size-4" aria-hidden="true" />
+                {isRewritingAi
+                  ? "Rewriting AI narrative..."
+                  : "Rewrite AI narrative"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Rewrite the AI narrative?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This makes one new OpenAI request and uses AI tokens even when
+                  no match has changed. The rewrite remains grounded only in the
+                  current cached sweepstake data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={isRewritingAi}
+                  onClick={onRewriteAiNarrative}
+                >
+                  Rewrite narrative
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
 
       {isOwner ? (
         <Card className="border-destructive/25">

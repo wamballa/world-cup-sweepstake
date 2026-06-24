@@ -74,6 +74,7 @@ export function createPreviewSharedBoardData(): SharedBoardData {
     sweepstakeName: previewSweepstakeName,
     tournamentCode: "WC_2026",
     sharedViewMode: "participant_board",
+    boardVariant: "official",
     participants,
     standings,
     teams,

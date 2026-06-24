@@ -107,6 +107,86 @@ function boardInput(
 }
 
 describe("shared board data mapper", () => {
+  it("defaults the main board variant to official", () => {
+    const board = buildSharedBoardData(boardInput());
+
+    expect(board.boardVariant).toBe("official");
+  });
+
+  it("maps the alternative main board variant for real sweepstakes", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        sweepstake: {
+          id: "sweepstake-1",
+          name: "Team1",
+          tournament_code: "WC_2026",
+          board_variant: "alternative",
+        },
+      }),
+    );
+
+    expect(board.boardVariant).toBe("alternative");
+  });
+
+  it("falls back to official for an unreadable board variant", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        sweepstake: {
+          id: "sweepstake-1",
+          name: "Team1",
+          tournament_code: "WC_2026",
+          board_variant: "unexpected" as "official",
+        },
+      }),
+    );
+
+    expect(board.boardVariant).toBe("official");
+  });
+
+  it("formats summer kickoffs in UK time", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        matches: [
+          {
+            id: "germany-curacao",
+            stage: "GROUP_STAGE",
+            status: "scheduled",
+            home_team_id: "team-a",
+            away_team_id: "team-b",
+            home_score: null,
+            away_score: null,
+            kickoff_at: "2026-06-14T17:00:00Z",
+            data_freshness: "scheduled",
+          },
+        ],
+      }),
+    );
+
+    expect(board.matches[0].kickoffLabel).toBe("14 Jun 2026, 18:00");
+  });
+
+  it("formats winter kickoffs in UK time", () => {
+    const board = buildSharedBoardData(
+      boardInput({
+        matches: [
+          {
+            id: "winter-match",
+            stage: "GROUP_STAGE",
+            status: "scheduled",
+            home_team_id: "team-a",
+            away_team_id: "team-b",
+            home_score: null,
+            away_score: null,
+            kickoff_at: "2026-01-14T17:00:00Z",
+            data_freshness: "scheduled",
+          },
+        ],
+      }),
+    );
+
+    expect(board.matches[0].kickoffLabel).toBe("14 Jan 2026, 17:00");
+  });
+
   it("formats summer sync timestamps in current UK time using BST", () => {
     const board = buildSharedBoardData(
       boardInput({
@@ -334,7 +414,7 @@ describe("shared board data mapper", () => {
     expect(board.badges[0]).toMatchObject({
       label: "1st Place",
       holderParticipantIds: ["participant-1"],
-      supportLine: "Highest participant total from cached tournament data.",
+      supportLine: "Top scoring team.",
     });
   });
 

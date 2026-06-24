@@ -106,12 +106,86 @@ const historicalTournamentMigration = readFileSync(
   "utf8",
 );
 
+const aiLifecycleMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260614110000_ai_generation_lifecycle.sql",
+  ),
+  "utf8",
+);
+
+const aiCacheRepairMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260614143000_repair_ai_generation_cache_constraint.sql",
+  ),
+  "utf8",
+);
+
+const leaderboardSnapshotsMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260617150000_leaderboard_snapshots.sql",
+  ),
+  "utf8",
+);
+
+const boardVariantMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260619100000_board_variant.sql",
+  ),
+  "utf8",
+);
+
+const keepyUppyScoresMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260622110000_keepy_uppy_scores.sql",
+  ),
+  "utf8",
+);
+
 describe("AI generation cache migration contract", () => {
   it("deduplicates AI generations by sweepstake, feature, and input hash", () => {
     expect(aiCacheMigration).toContain(
       "ai_generations_sweepstake_feature_hash_idx",
     );
     expect(aiCacheMigration).toContain(
+      "on public.ai_generations(sweepstake_id, feature_key, input_hash)",
+    );
+  });
+
+  it("serializes generation and records admin rewrites", () => {
+    expect(aiLifecycleMigration).toContain(
+      "create or replace function public.claim_ai_generation",
+    );
+    expect(aiLifecycleMigration).toContain("generation_status");
+    expect(aiLifecycleMigration).toContain("generation_reason");
+    expect(aiLifecycleMigration).toContain("rewritten_by");
+    expect(aiLifecycleMigration).toContain("lease_expires_at");
+    expect(aiLifecycleMigration).toContain(
+      "'generating', 'ready', 'invalid'",
+    );
+    expect(aiLifecycleMigration).toContain("grant execute");
+    expect(aiLifecycleMigration).toContain("to service_role");
+  });
+
+  it("repairs the production cache-key constraint used by generation claims", () => {
+    expect(aiCacheRepairMigration).toContain(
+      "create unique index ai_generations_claim_unique_idx",
+    );
+    expect(aiCacheRepairMigration).toContain(
       "on public.ai_generations(sweepstake_id, feature_key, input_hash)",
     );
   });
@@ -131,5 +205,93 @@ describe("Historical World Cup tournament migration contract", () => {
     expect(historicalTournamentMigration).not.toContain(
       "add value if not exists 'tournament_reset'",
     );
+  });
+});
+
+describe("Leaderboard snapshot migration contract", () => {
+  it("adds append-only leaderboard snapshot tables", () => {
+    expect(leaderboardSnapshotsMigration).toContain(
+      "create type public.leaderboard_snapshot_trigger",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "create table public.leaderboard_snapshots",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "create table public.leaderboard_snapshot_rows",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "unique (sweepstake_id, snapshot_key)",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "leaderboard_snapshots_initial_baseline_unique_idx",
+    );
+  });
+
+  it("keeps snapshot data behind admin-only RLS reads", () => {
+    expect(leaderboardSnapshotsMigration).toContain(
+      "alter table public.leaderboard_snapshots enable row level security;",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      "alter table public.leaderboard_snapshot_rows enable row level security;",
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      'create policy "leaderboard snapshots admin read"',
+    );
+    expect(leaderboardSnapshotsMigration).toContain(
+      'create policy "leaderboard snapshot rows admin read"',
+    );
+    expect(leaderboardSnapshotsMigration).not.toContain("for insert");
+    expect(leaderboardSnapshotsMigration).not.toContain("to anon");
+  });
+});
+
+describe("Board variant migration contract", () => {
+  it("adds a sweepstake-level board variant without changing snapshots", () => {
+    expect(boardVariantMigration).toContain("create type public.board_variant");
+    expect(boardVariantMigration).toContain("'official', 'alternative'");
+    expect(boardVariantMigration).toContain(
+      "add column if not exists board_variant public.board_variant not null default 'official'",
+    );
+    expect(boardVariantMigration).toContain(
+      "create or replace function public.get_sweepstake_by_share_token",
+    );
+    expect(boardVariantMigration).toContain(
+      "board_variant public.board_variant",
+    );
+    expect(boardVariantMigration).not.toContain("leaderboard_snapshot_rows");
+  });
+});
+
+describe("Keepy-uppy scores migration contract", () => {
+  it("adds a sweepstake-scoped high-score table with validation", () => {
+    expect(keepyUppyScoresMigration).toContain(
+      "create table if not exists public.keepy_uppy_scores",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "sweepstake_id uuid not null references public.sweepstakes(id) on delete cascade",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "player_name text not null check (char_length(trim(player_name)) between 1 and 40)",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "score integer not null check (score between 1 and 999)",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "created_at timestamptz not null default now()",
+    );
+  });
+
+  it("indexes top-score reads and keeps browser access closed by RLS", () => {
+    expect(keepyUppyScoresMigration).toContain(
+      "keepy_uppy_scores_top_scores_idx",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "on public.keepy_uppy_scores(sweepstake_id, score desc, created_at asc)",
+    );
+    expect(keepyUppyScoresMigration).toContain(
+      "alter table public.keepy_uppy_scores enable row level security;",
+    );
+    expect(keepyUppyScoresMigration).not.toContain("create policy");
+    expect(keepyUppyScoresMigration).not.toContain("to anon");
   });
 });

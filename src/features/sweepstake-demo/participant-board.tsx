@@ -128,7 +128,7 @@ export function ParticipantBoard({
         />
       </CampaignPageStack>
       <AiSweepstakeUpdateButton
-        freshnessLabel={boardData.syncState.freshnessLabel}
+        sourceUpdatedAt={boardData.syncState.lastSuccessfulSyncAt}
         shareToken={shareToken}
       />
     </CampaignShell>

@@ -1,5 +1,89 @@
 # Decision Log
 
+## 2026-06-24: Alternative Hero Shows Up To Six Matches
+
+Decision: Show up to six Today's matches in the Alternative Board hero and use a three-column grid at wide desktop widths, keeping the overflow cue for seven or more matches.
+
+Reason: The taller Keepy-Uppy panel creates room for a fuller 3 x 2 fixture grid without making the hero feel overcrowded. The Matches tab remains the complete fixture list.
+
+## 2026-06-24: Alternative Hero Overflow Cue Moves To Heading
+
+Decision: Move the Alternative Board Today's matches overflow cue into the section heading row and remove the standalone bottom pill.
+
+Reason: The hero should keep the four-card match cap without leaving a dangling control in the bottom-left whitespace. The Matches tab remains the complete fixture list.
+
+## 2026-06-24: Alternative Hero Top-Aligns Keepy-Uppy
+
+Decision: Top-align the Alternative Board hero columns and increase the desktop Keepy-Uppy frame height so the challenge starts level with the Shared scoreboard pill and balances the Today's matches column.
+
+Reason: The previous bottom-aligned Keepy-Uppy panel floated lower than the left hero content. Top alignment and a taller desktop frame make the challenge feel integrated into the hero without changing mobile, official board, sync, scoring, schema, routing, or admin behavior.
+
+## 2026-06-24: Alternative Hero Limits Match Cards
+
+Decision: Limit the Alternative Board hero Today's matches section to four visible cards, show a compact overflow cue for additional matches, and style completed scorelines as distinct score badges.
+
+Reason: The hero should give useful fixture context without becoming denser than the Keepy-Uppy side of the panel. The full Matches tab remains the complete fixture surface.
+
+## 2026-06-24: Alternative Hero Final Matches Show Scores
+
+Decision: In the Alternative Board hero Today's matches cards, show cached final scorelines for completed matches when both team scores are present, while scheduled matches keep kickoff labels and other statuses keep status labels.
+
+Reason: Completed hero fixtures are more useful when they show the actual result, and the score is already part of the cached shared-board match data.
+
+## 2026-06-24: Alternative Board Hero Shows Today's Matches
+
+Decision: Remove the duplicated cached-data freshness copy from only the Alternative Board hero and replace it with a compact "Today's matches" section, while leaving the top header Last Updated card and the official shared scoreboard hero unchanged.
+
+Reason: Freshness information is already available in the Alternative Board summary header, so the hero can use that space for immediately useful fixture context without changing football-data sync, scoring, schema, routing, or admin settings.
+
+## 2026-06-24: Keepy-Uppy Captures Top-10 Scores Again
+
+Decision: Reintroduce top-10 qualification for shared Keepy-Uppy score capture while keeping the hero `Hi Score` as the highest saved score. Positive streaks that miss the top 10 show a read-only "Sorry, you didn't make it" dialog with the current table.
+
+Reason: Participants should be able to enter the shared table even without setting a new high score, while failed attempts still get clear feedback and official sweepstake scoring remains untouched.
+
+## 2026-06-22: Admin Keepy-Uppy Reset Clears Only Mini-Game Scores
+
+Decision: Add an admin-only Keepy-Uppy high-score reset that deletes only `keepy_uppy_scores` rows for the current sweepstake after confirmation, then revalidates the admin and shared-board routes.
+
+Reason: The mini-game score table is intentionally separate from official sweepstake scoring. Clearing it should reset the visible Alternative Board `Hi Score` to 0 without changing allocations, badges, football scoring, board variant settings, or participant standings.
+
+## 2026-06-22: Keepy-Uppy Avoids WebGL In Shared Hero
+
+Decision: Render the Alternative Board Keepy-Uppy challenge with the existing HTML/CSS ball and branded frame only, removing the decorative Three.js/WebGL canvas from the shared-board hero panel.
+
+Reason: The canvas layer was redundant for interaction and could remain in an opaque white error state after the high-score dialog flow, covering the branded frame. Keeping the DOM ball preserves the mini-game while removing the unstable rendering dependency from the participant surface.
+
+## 2026-06-22: Alternative Board Keepy-Uppy High Scores
+
+Decision: Add a separate `keepy_uppy_scores` table scoped by `sweepstake_id` for the Alternative Board mini-game only, with player names trimmed to 1-40 characters, scores constrained to 1-999, top-10 ordering by score descending then earliest creation time, and no anon/browser RLS policies. Shared-link route handlers validate the share token and Alternative Board variant server-side before service-role reads or writes. The hardcoded preview Alternative Board does not write persistent scores.
+
+Reason: The mini-game should let participants compete across devices without affecting official allocations, scoring, badges, or leaderboard data. Keeping persistence server-only and board-variant-gated preserves the shared-link security model while the tight validation limits prevent oversized names or unrealistic scores from damaging the compact hero UI.
+
+## 2026-06-19: Admin Board Variant Switch
+
+Decision: Add a sweepstake-level `board_variant` setting with `official` and `alternative` values so real shared URLs at `/s/[shareToken]` can render either the current `ParticipantBoard` or the existing `AlternativeBoard` without changing public share tokens. Countdown mode continues to take priority through `shared_view_mode`, and the hardcoded preview token remains on the official preview board while `/alternative-board` remains the Alternative Board preview route.
+
+Reason: A database-backed admin toggle gives immediate rollback to the official board without a deploy, preserves the old main board, avoids a risky hard route swap, and keeps `ALTERNATIVE_BOARD_ENABLED` scoped to the hidden comparison route only.
+
+## 2026-06-14: BL-113 UK Kickoff Time Formatting
+
+Decision: Keep football-data.org `utcDate` values and Supabase `kickoff_at` timestamps as UTC instants, but format all participant-facing kickoff labels with `timeZone: "Europe/London"` and omit timezone abbreviations from the displayed label. The shared-board DTO remains the single formatting boundary used by match tables, countdowns, personal match summaries, and AI fixture context.
+
+Reason: Vercel renders in UTC, so implicit date formatting displayed Germany v Curaçao at `17:00` even though `2026-06-14T17:00:00Z` is `18:00 BST`. Explicit London formatting is deterministic across server, browser, local development, and daylight-saving transitions without changing authoritative football data.
+
+## 2026-06-14: BL-112 Match-Based AI Narrative Lifecycle
+
+Decision: Cache AI Agent narratives by prompt version, completed match IDs and scores, resulting standings, allocations, and badge holders. Browser refreshes, repeated Agent opens, live-score changes, upcoming-fixture changes, and routine football-data sync timestamps do not invalidate the narrative. The first Agent open after one or more newly completed matches generates one combined update, protected by a database-backed generation lease so concurrent viewers share one OpenAI request.
+
+Decision: Add a confirmed admin-only `Rewrite AI narrative` action with no cooldown. Each confirmed action may make one OpenAI request from current cached app facts, atomically replaces the narrative for the current factual state, records the successful rewrite and actor, and preserves the previous narrative if generation fails.
+
+Decision: Use a warm, dry, office-safe "witty colleague" voice with at most one humorous observation, no forced jokes or stock football clichés, and no year in Agent-facing freshness dates. All existing grounding, scoring, delayed-data, gambling, and anti-hallucination rules remain unchanged.
+
+Update: Treat generated prose as untrusted until deterministic checks confirm that competition-state wording, completed scorelines, fixtures, team names, participant points, ranks, and shared-place counts are supported by the prompt payload. Retry one rejected draft with explicit correction instructions; if the second draft fails or generation errors, retain and serve the previous valid narrative.
+
+Reason: Match-based invalidation keeps participant commentary current at useful milestones without spending tokens on browser refreshes or polling noise. The explicit admin override provides editorial control while confirmation makes the token cost visible.
+
 ## 2026-06-12: BL-111 Five-Minute Match Sync And Diagnostics
 
 Decision: Run the protected production cron every five minutes. Scheduled runs always fetch matches, while teams and flag assets refresh when the last successful full sync is at least 30 minutes old. Manual and historical-dataset syncs remain full refreshes. Persist the trigger, sync mode, configured cadence, API request count, upstream status summary, latest upstream update time, and match status/score transitions in the existing sync-run metadata. Refresh visible participant boards every 60 seconds and expose sanitized sync health and recent runs only to authenticated admins.

@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "@/server/supabase/database.types";
 import { getSupabaseServiceRoleClient } from "@/server/supabase/client";
 import { getFootballDataTournamentByCode } from "@/features/tournaments/world-cup";
+import { captureLeaderboardSnapshots } from "@/server/persistence/leaderboard-snapshots";
 
 import { cacheFootballData } from "./cache";
 import { createFootballDataClient, type FootballDataClient } from "./client";
@@ -28,6 +29,7 @@ export type FootballDataSyncResult = {
   statCount: number;
   recordsChanged: number;
   recalculatedSweepstakes: number;
+  leaderboardSnapshotsCreated?: number;
   flagAssetResult?: TeamFlagAssetResult;
   errorMessage?: string;
 };
@@ -67,6 +69,7 @@ export async function runFootballDataSync(options?: {
       statCount: 0,
       recordsChanged: 0,
       recalculatedSweepstakes: 0,
+      leaderboardSnapshotsCreated: 0,
       errorMessage:
         "Skipped football-data.org sync because the last sync started less than one minute ago.",
     };
@@ -131,13 +134,22 @@ export async function runFootballDataSync(options?: {
         ? await tryCacheTeamFlagAssets(supabase, tournament.code)
         : undefined;
     const sourceUpdatedAt = now().toISOString();
-    const recalculatedSweepstakes = await recalculateAllSweepstakeScores(
+    const recalculationResult = await recalculateAllSweepstakeScores(
       supabase,
       sourceUpdatedAt,
       tournament.code,
     );
+    const snapshotResult = await captureLeaderboardSnapshots(supabase, {
+      recalculatedSweepstakes: recalculationResult.recalculatedSweepstakes,
+      tournamentCode: tournament.code,
+      sourceUpdatedAt,
+      syncRunId: runId,
+      matchTransitions,
+    });
     const recordsChanged =
-      normalized.recordsChanged + recalculatedSweepstakes;
+      normalized.recordsChanged +
+      recalculationResult.count +
+      snapshotResult.created;
     const successMetadata = {
       ...metadata,
       cacheResult,
@@ -145,7 +157,8 @@ export async function runFootballDataSync(options?: {
       upstreamStatusCounts: countUpstreamStatuses(matches.matches),
       upstreamLatestUpdatedAt: getLatestUpstreamUpdatedAt(matches.matches),
       matchTransitions,
-      recalculatedSweepstakes,
+      recalculatedSweepstakes: recalculationResult.count,
+      leaderboardSnapshotsCreated: snapshotResult.created,
       lastSuccessfulSyncAt: sourceUpdatedAt,
     } satisfies Json;
 
@@ -169,7 +182,8 @@ export async function runFootballDataSync(options?: {
       matchCount: cacheResult.matchCount,
       statCount: cacheResult.statCount,
       recordsChanged,
-      recalculatedSweepstakes,
+      recalculatedSweepstakes: recalculationResult.count,
+      leaderboardSnapshotsCreated: snapshotResult.created,
       flagAssetResult,
     };
   } catch (error) {
@@ -191,6 +205,7 @@ export async function runFootballDataSync(options?: {
       statCount: 0,
       recordsChanged: 0,
       recalculatedSweepstakes: 0,
+      leaderboardSnapshotsCreated: 0,
       errorMessage,
     };
   }
@@ -311,8 +326,14 @@ export function buildMatchTransitions(
         matchId: match.external_id,
         previousStatus: previous.status,
         nextStatus: match.status,
-        previousScore: [previous.home_score, previous.away_score],
-        nextScore: [match.home_score, match.away_score],
+        previousScore: [previous.home_score, previous.away_score] as [
+          number | null,
+          number | null,
+        ],
+        nextScore: [match.home_score, match.away_score] as [
+          number | null,
+          number | null,
+        ],
       },
     ];
   });

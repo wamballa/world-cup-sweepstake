@@ -228,7 +228,7 @@ export const mockMatches: MockMatch[] = [
     awayTeamId: "team-a-2",
     homeScore: 2,
     awayScore: 1,
-    kickoffLabel: "Matchday 1",
+    kickoffLabel: "14 Jun 2026, 18:00",
     freshness: "final",
   },
   {

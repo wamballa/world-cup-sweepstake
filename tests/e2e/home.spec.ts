@@ -106,6 +106,17 @@ test("admin can use dashboard, setup flow, sweepstake tabs, and draw teams", asy
 
   await page.getByRole("tab", { name: "Settings" }).click();
   await expect(page.getByLabel("Sweepstake name")).toHaveValue(/QA Office Draw/);
+  await expect(
+    page.getByRole("button", { name: "Rewrite AI narrative" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Rewrite AI narrative" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Rewrite the AI narrative?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("uses AI tokens even when no match has changed"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
   await page.getByLabel("Admin emails").fill("ops@example.com");
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved to your account.")).toBeVisible();
@@ -315,6 +326,12 @@ test("participant board is separated from admin controls and supports saved iden
       .getByRole("row")
       .filter({ hasText: "Aurora Republic v Bayside Union" })
       .getByText("Completed", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("row")
+      .filter({ hasText: "Aurora Republic v Bayside Union" })
+      .getByText("14 Jun 2026, 18:00", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByLabel("Friday Office Draw").getByText("Delayed").first(),

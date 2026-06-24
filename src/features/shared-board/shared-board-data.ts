@@ -88,6 +88,7 @@ export type SharedBoardData = {
   sweepstakeName: string;
   tournamentCode: string;
   sharedViewMode: "participant_board" | "countdown";
+  boardVariant: "official" | "alternative";
   participants: SharedBoardParticipant[];
   standings: SharedBoardStanding[];
   teams: SharedBoardTeam[];
@@ -104,6 +105,7 @@ export type SharedBoardMapperInput = {
     name: string;
     tournament_code: string;
     shared_view_mode?: "participant_board" | "countdown";
+    board_variant?: "official" | "alternative" | null;
   };
   participants: Array<{
     id: string;
@@ -167,14 +169,14 @@ export type SharedBoardMapperInput = {
 };
 
 const badgeSupportLines: Record<string, string> = {
-  "first-place": "Highest participant total from cached tournament data.",
-  "second-place": "Second-highest participant total from cached tournament data.",
-  "third-place": "Third-highest participant total from cached tournament data.",
-  "fourth-place": "Fourth-highest participant total from cached tournament data.",
-  "wooden-spoon": "Lowest participant total from cached tournament data.",
-  "first-knocked-out": "Allocated the first team eliminated from cached results.",
-  "most-goals-conceded": "Allocated the team with the most goals conceded.",
-  "fewest-goals-scored": "Allocated the team with the fewest goals scored.",
+  "first-place": "Top scoring team.",
+  "second-place": "Second highest scoring team.",
+  "third-place": "Third highest scoring team.",
+  "fourth-place": "Fourth highest scoring team.",
+  "wooden-spoon": "Lowest scoring team.",
+  "first-knocked-out": "First team eliminated.",
+  "most-goals-conceded": "Team with the most goals conceded.",
+  "fewest-goals-scored": "Team with the fewest goals scored.",
 };
 
 export function buildSharedBoardData(
@@ -298,6 +300,10 @@ export function buildSharedBoardData(
     sweepstakeName: input.sweepstake.name,
     tournamentCode: input.sweepstake.tournament_code,
     sharedViewMode: input.sweepstake.shared_view_mode ?? "participant_board",
+    boardVariant:
+      input.sweepstake.board_variant === "alternative"
+        ? "alternative"
+        : "official",
     participants,
     standings,
     teams: sharedTeams,
@@ -574,8 +580,13 @@ function formatKickoff(kickoffAt: string | null) {
   }
 
   return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/London",
   }).format(new Date(kickoffAt));
 }
 
