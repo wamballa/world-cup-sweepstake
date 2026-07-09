@@ -1,5 +1,17 @@
 # Decision Log
 
+## 2026-07-09: Alternative Board Scoring Source Of Truth
+
+Decision: Centralize the Alternative Board visible scoring around the Alternative Board team rows. Team scores are calculated as group-stage results plus one non-cumulative furthest-stage bonus: group `+0`, Last 32 `+0`, Round of 16 `+10`, Quarter-final `+16`, Semi-final `+24`, runner-up `+30`, and winner `+100`. Knockout match wins, draws, losses, goals for, and goals against still count in the Teams tab record columns, but only group-stage wins/draws contribute match points. Participants are ranked from the average of their allocated Alternative Board team scores, displayed to one decimal place only when needed, and tied averages share a rank before name-based ordering.
+
+Reason: The promoted Alternative Board must be explainable from the visible Teams tab rather than from persisted official `team_scores` or `participant_scores`. Last 32 participation should not accidentally receive the Round of 16 bonus, stage bonuses must not stack, and participants with different team counts need a fair average-based comparison. Official board scoring, persisted scoring tables, football-data sync, Supabase schema, allocations, and Keepy-Uppy scores remain unchanged.
+
+## 2026-06-24: Production Feature Inventory
+
+Decision: Keep the live product feature inventory in `/docs/production-feature-list.md` and add only a pointer from `AGENTS.md`.
+
+Reason: `AGENTS.md` should stay focused on operating rules and source-of-truth pointers. A separate feature inventory gives future sessions a fast way to understand shipped behavior without scanning code or inflating every agent prompt.
+
 ## 2026-06-24: Alternative Hero Shows Up To Six Matches
 
 Decision: Show up to six Today's matches in the Alternative Board hero and use a three-column grid at wide desktop widths, keeping the overflow cue for seven or more matches.

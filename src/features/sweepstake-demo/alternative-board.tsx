@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  buildAlternativeBoardRows,
   type AlternativeTeamBoardRow,
   buildAlternativeBadgeRows,
   buildAlternativeTeamBoardRows,
@@ -42,24 +43,42 @@ const heroMatchLimit = 6;
 
 export function AlternativeBoard({
   boardData,
-  initialTab = "participants",
-  officialMovementByParticipantId,
+  initialTab = "teams",
+  alternativeMovementByParticipantId,
   keepyUppyScoreboard,
   shareToken,
 }: {
   boardData: SharedBoardData;
   initialTab?:
-    | "participants"
     | "teams"
     | "badges"
     | "matches"
     | "stats"
     | "explainer";
-  officialMovementByParticipantId?: LeaderboardMovementMap;
+  alternativeMovementByParticipantId?: LeaderboardMovementMap;
   keepyUppyScoreboard?: KeepyUppyScoreboard;
   shareToken?: string;
 }) {
-  const leadingParticipant = boardData.standings[0];
+  const alternativeStandings = buildAlternativeBoardRows(boardData).map(
+    (row) => ({
+      participantId: row.participantId,
+      name: row.name,
+      rank: row.rank,
+      points: Number(row.displayAlternativeScore),
+      teamCount: row.assignedTeamCount,
+      teamNames: row.teamNames,
+      teamIds: row.teamIds,
+    }),
+  );
+  const alternativeBoardData = {
+    ...boardData,
+    standings: alternativeStandings,
+    summary: {
+      ...boardData.summary,
+      leaderName: alternativeStandings[0]?.name ?? null,
+    },
+  };
+  const leadingParticipant = alternativeStandings[0];
   const leadingTeamRow = buildAlternativeTeamBoardRows(boardData)[0];
   const heroLeaderLabel = leadingTeamRow
     ? formatAlternativeTeamLeaderLabel(leadingTeamRow)
@@ -98,16 +117,17 @@ export function AlternativeBoard({
             </div>
           }
         >
-          <CampaignHeading eyebrow="Shared sweepstake board · v2.0">
+          <CampaignHeading eyebrow="Shared sweepstake board · v2.1">
             {boardData.sweepstakeName || "Untitled sweepstake"}
           </CampaignHeading>
         </CampaignHeader>
 
         <SharedScoreboard
-          boardData={boardData}
+          boardData={alternativeBoardData}
           defaultTab={initialTab}
           leadingParticipant={leadingParticipant}
-          officialMovementByParticipantId={officialMovementByParticipantId}
+          officialMovementByParticipantId={alternativeMovementByParticipantId}
+          showParticipantsTab={false}
           showParticipantsHeader
           stickyBoardControls
           badgesContent={<AlternativeBadgesPanel boardData={boardData} />}
@@ -332,10 +352,6 @@ function AlternativeExplainerPanel() {
           Teams are ranked by points first. If teams are level, the board
           separates them by tournament progress, wins, goal difference, goals
           scored, goals conceded, then team name.
-        </p>
-        <p className="text-sm font-semibold text-campaign-ink">
-          The Participants tab shows everyone&apos;s current sweepstake position
-          and allocated teams.
         </p>
         <p className="text-sm font-semibold text-campaign-ink">
           Badges on this board are awarded by team performance and shown as

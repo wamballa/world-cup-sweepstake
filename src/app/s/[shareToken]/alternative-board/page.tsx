@@ -40,7 +40,7 @@ export default async function AlternativeBoardPage({
     <AlternativeBoard
       boardData={boardData}
       keepyUppyScoreboard={keepyUppyScoreboard}
-      officialMovementByParticipantId={movement.officialMovementByParticipantId}
+      alternativeMovementByParticipantId={movement.alternativeMovementByParticipantId}
       shareToken={shareToken}
     />
   );

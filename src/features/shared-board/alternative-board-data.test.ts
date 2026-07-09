@@ -269,6 +269,267 @@ describe("alternative board data", () => {
     ]);
   });
 
+  it("counts only group-stage results for match points while using the qualified stage bonus", () => {
+    const rows = buildAlternativeTeamBoardRows(
+      boardData({
+        participants: [
+          {
+            id: "steve",
+            name: "Steve",
+            emailUpdatesEnabled: false,
+          },
+        ],
+        teams: [
+          team("france", "France", 0, "steve", {
+            allocatedToName: "Steve",
+          }),
+        ],
+        matches: [
+          match({
+            id: "group-win-1",
+            stage: "GROUP_STAGE",
+            status: "final",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "group-a",
+            awayTeamName: "Group A",
+            homeScore: 3,
+            awayScore: 1,
+          }),
+          match({
+            id: "group-win-2",
+            stage: "Group",
+            status: "final",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "group-b",
+            awayTeamName: "Group B",
+            homeScore: 3,
+            awayScore: 0,
+          }),
+          match({
+            id: "group-win-3",
+            stage: "Group Stage",
+            status: "final",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "group-c",
+            awayTeamName: "Group C",
+            homeScore: 4,
+            awayScore: 1,
+          }),
+          match({
+            id: "last-32-win",
+            stage: "Last 32",
+            status: "final",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "last-32-opponent",
+            awayTeamName: "Last 32 Opponent",
+            homeScore: 3,
+            awayScore: 0,
+          }),
+          match({
+            id: "last-16-win",
+            stage: "LAST_16",
+            status: "final",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "last-16-opponent",
+            awayTeamName: "Last 16 Opponent",
+            homeScore: 1,
+            awayScore: 0,
+          }),
+          match({
+            id: "quarter-final",
+            stage: "Quarter Finals",
+            status: "scheduled",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "quarter-final-opponent",
+            awayTeamName: "Quarter Final Opponent",
+            kickoffAt: "2026-07-09T20:00:00.000Z",
+            kickoffLabel: "9 Jul 2026, 21:00",
+          }),
+        ],
+      }),
+    );
+
+    expect(rows[0]).toMatchObject({
+      teamName: "France",
+      wins: 5,
+      points: 25,
+      status: "quarter-final",
+    });
+  });
+
+  it("does not award the Round of 16 bonus for a team eliminated in the Last 32", () => {
+    const rows = buildAlternativeTeamBoardRows(
+      boardData({
+        teams: [
+          team("croatia", "Croatia", 6, "andy", {
+            allocatedToName: "Andy",
+          }),
+        ],
+        matches: [
+          groupResult("croatia-group-loss", "croatia", 2, 4),
+          groupResult("croatia-group-win-1", "croatia", 1, 0),
+          groupResult("croatia-group-win-2", "croatia", 2, 1),
+          match({
+            id: "croatia-last-32-loss",
+            stage: "LAST_32",
+            status: "final",
+            homeTeamId: "croatia",
+            homeTeamName: "Croatia",
+            awayTeamId: "portugal",
+            awayTeamName: "Portugal",
+            homeScore: 1,
+            awayScore: 2,
+          }),
+        ],
+      }),
+    );
+
+    expect(rows[0]).toMatchObject({
+      teamName: "Croatia",
+      wins: 2,
+      losses: 2,
+      points: 6,
+      status: "group",
+    });
+  });
+
+  it("still treats Last 32 as a knockout stage for first knocked out badges", () => {
+    const rows = buildAlternativeBadgeRows(
+      boardData({
+        badges: [badge("badge-first-out", "First Knocked Out")],
+        teams: [
+          team("croatia", "Croatia", 6, "andy", {
+            allocatedToName: "Andy",
+          }),
+        ],
+        matches: [
+          match({
+            id: "croatia-last-32-loss",
+            stage: "Last 32",
+            status: "final",
+            homeTeamId: "croatia",
+            homeTeamName: "Croatia",
+            awayTeamId: "portugal",
+            awayTeamName: "Portugal",
+            homeScore: 1,
+            awayScore: 2,
+          }),
+        ],
+      }),
+    );
+
+    expect(rows[0]).toMatchObject({
+      label: "First Knocked Out",
+      holderLabels: ["Andy (Croatia)"],
+    });
+  });
+
+  it("averages participant scores from visible Alternative Board team scores", () => {
+    const rows = buildAlternativeBoardRows(
+      boardData({
+        participants: [
+          {
+            id: "steve",
+            name: "Steve Tyrell",
+            emailUpdatesEnabled: false,
+          },
+        ],
+        teams: [
+          team("france", "France", 17, "steve", {
+            allocatedToName: "Steve Tyrell",
+          }),
+          team("belgium", "Belgium", 13, "steve", {
+            allocatedToName: "Steve Tyrell",
+          }),
+        ],
+        matches: [
+          groupResult("france-group-1", "france", 3, 1),
+          groupResult("france-group-2", "france", 3, 0),
+          groupResult("france-group-3", "france", 4, 1),
+          groupResult("belgium-group-1", "belgium", 1, 1),
+          groupResult("belgium-group-2", "belgium", 0, 0),
+          groupResult("belgium-group-3", "belgium", 5, 1),
+          match({
+            id: "france-last-32",
+            stage: "Last 32",
+            status: "final",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "sweden",
+            awayTeamName: "Sweden",
+            homeScore: 3,
+            awayScore: 0,
+          }),
+          match({
+            id: "belgium-last-32",
+            stage: "LAST_32",
+            status: "final",
+            homeTeamId: "belgium",
+            homeTeamName: "Belgium",
+            awayTeamId: "senegal",
+            awayTeamName: "Senegal",
+            homeScore: 3,
+            awayScore: 2,
+          }),
+          match({
+            id: "france-last-16",
+            stage: "Last 16",
+            status: "final",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "paraguay",
+            awayTeamName: "Paraguay",
+            homeScore: 1,
+            awayScore: 0,
+          }),
+          match({
+            id: "belgium-last-16",
+            stage: "ROUND_OF_16",
+            status: "final",
+            homeTeamId: "belgium",
+            homeTeamName: "Belgium",
+            awayTeamId: "usa",
+            awayTeamName: "United States",
+            homeScore: 4,
+            awayScore: 1,
+          }),
+          match({
+            id: "france-quarter-final",
+            stage: "QUARTER_FINALS",
+            status: "scheduled",
+            homeTeamId: "france",
+            homeTeamName: "France",
+            awayTeamId: "morocco",
+            awayTeamName: "Morocco",
+          }),
+          match({
+            id: "belgium-quarter-final",
+            stage: "Quarter Finals",
+            status: "scheduled",
+            homeTeamId: "spain",
+            homeTeamName: "Spain",
+            awayTeamId: "belgium",
+            awayTeamName: "Belgium",
+          }),
+        ],
+      }),
+    );
+
+    expect(rows[0]).toMatchObject({
+      name: "Steve Tyrell",
+      totalOfficialTeamScore: 46,
+      assignedTeamCount: 2,
+      alternativeScore: 23,
+      displayAlternativeScore: "23",
+    });
+  });
+
   it("maps official snapshot scoring breakdowns to revised Alternative Board bonuses", () => {
     expect(
       calculateAlternativeBoardSnapshotTeamPoints({
@@ -465,6 +726,7 @@ describe("alternative board data", () => {
           }),
           match({
             id: "can-den",
+            stage: "LAST_16",
             status: "final",
             homeTeamId: "canada",
             homeTeamName: "Canada",
@@ -515,7 +777,7 @@ describe("alternative board data", () => {
       }),
       expect.objectContaining({
         label: "First Knocked Out",
-        holderLabels: [],
+        holderLabels: ["Jobin (Denmark)"],
         supportLine: "First team eliminated.",
       }),
       expect.objectContaining({
@@ -566,6 +828,25 @@ function finalMatch(
 ): SharedBoardData["matches"][number] {
   return match({
     id,
+    status: "final",
+    homeTeamId,
+    homeTeamName: homeTeamId,
+    awayTeamId: "opponent",
+    awayTeamName: "Opponent",
+    homeScore,
+    awayScore,
+  });
+}
+
+function groupResult(
+  id: string,
+  homeTeamId: string,
+  homeScore: number,
+  awayScore: number,
+): SharedBoardData["matches"][number] {
+  return match({
+    id,
+    stage: "GROUP_STAGE",
     status: "final",
     homeTeamId,
     homeTeamName: homeTeamId,

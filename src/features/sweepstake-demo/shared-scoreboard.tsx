@@ -75,6 +75,7 @@ export function SharedScoreboard({
   heroLeaderLabel,
   officialMovementByParticipantId,
   showParticipantsHeader = false,
+  showParticipantsTab = true,
   stickyBoardControls = false,
   teamsContent,
 }: {
@@ -90,12 +91,14 @@ export function SharedScoreboard({
   heroLeaderLabel?: string;
   officialMovementByParticipantId?: LeaderboardMovementMap;
   showParticipantsHeader?: boolean;
+  showParticipantsTab?: boolean;
   stickyBoardControls?: boolean;
   teamsContent?: ReactNode;
 }) {
   const standings = boardData.standings;
   const hasStarted = boardData.summary.hasFinalMatches;
-  const tabCount = 6 + extraTabsAfterParticipants.length;
+  const tabCount =
+    5 + extraTabsAfterParticipants.length + (showParticipantsTab ? 1 : 0);
 
   return (
     <section
@@ -154,11 +157,13 @@ export function SharedScoreboard({
               gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))`,
             }}
           >
-            <SharedScoreboardTabTrigger
-              value="participants"
-              label="Participants"
-              icon={<UsersRound className="size-4" aria-hidden="true" />}
-            />
+            {showParticipantsTab ? (
+              <SharedScoreboardTabTrigger
+                value="participants"
+                label="Participants"
+                icon={<UsersRound className="size-4" aria-hidden="true" />}
+              />
+            ) : null}
             {extraTabsAfterParticipants.map((tab) => (
               <SharedScoreboardTabTrigger
                 key={tab.value}
@@ -194,18 +199,22 @@ export function SharedScoreboard({
             />
           </TabsList>
 
-          <TabsContent
-            value="participants"
-            className={stickyBoardControls ? "pt-3" : undefined}
-          >
-            <ParticipantsPanel
-              selectedParticipantId={selectedParticipantId}
-              boardData={boardData}
-              officialMovementByParticipantId={officialMovementByParticipantId}
-              showHeader={showParticipantsHeader}
-              stickyHeader={stickyBoardControls}
-            />
-          </TabsContent>
+          {showParticipantsTab ? (
+            <TabsContent
+              value="participants"
+              className={stickyBoardControls ? "pt-3" : undefined}
+            >
+              <ParticipantsPanel
+                selectedParticipantId={selectedParticipantId}
+                boardData={boardData}
+                officialMovementByParticipantId={
+                  officialMovementByParticipantId
+                }
+                showHeader={showParticipantsHeader}
+                stickyHeader={stickyBoardControls}
+              />
+            </TabsContent>
+          ) : null}
           {extraTabsAfterParticipants.map((tab) => (
             <TabsContent key={tab.value} value={tab.value}>
               {tab.content}

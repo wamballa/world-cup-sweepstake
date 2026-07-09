@@ -21,19 +21,19 @@ vi.mock("@/features/sweepstake-demo/alternative-board", () => ({
   AlternativeBoard: ({
     boardData,
     keepyUppyScoreboard,
-    officialMovementByParticipantId,
+    alternativeMovementByParticipantId,
     shareToken,
   }: {
     boardData: SharedBoardData;
     keepyUppyScoreboard?: unknown;
-    officialMovementByParticipantId?: Record<string, string>;
+    alternativeMovementByParticipantId?: Record<string, string>;
     shareToken?: string;
   }) => ({
     type: "AlternativeBoard",
     props: {
       boardData,
       keepyUppyScoreboard,
-      officialMovementByParticipantId,
+      alternativeMovementByParticipantId,
       shareToken,
     },
     key: null,
@@ -136,7 +136,7 @@ describe("shared sweepstake route board variant", () => {
       highScore: 12,
       scores: [],
     });
-    expect(page.props.officialMovementByParticipantId).toEqual({ maya: "+1" });
+    expect(page.props.alternativeMovementByParticipantId).toEqual({ maya: "-" });
   });
 
   it("lets countdown mode override the Alternative Board variant", async () => {

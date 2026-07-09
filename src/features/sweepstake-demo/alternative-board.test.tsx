@@ -51,15 +51,15 @@ describe("AlternativeBoard", () => {
     renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
 
     expect(
-      screen.getByText("Shared sweepstake board · v2.0"),
+      screen.getByText("Shared sweepstake board · v2.1"),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Engineering" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Players")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Teams").length).toBeGreaterThan(0);
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
     expect(screen.getByText("Last Updated")).toBeInTheDocument();
     expect(screen.getByText("17 Jun 2026, 12:00")).toBeInTheDocument();
     expect(screen.getByText("Today's matches")).toBeInTheDocument();
@@ -211,49 +211,37 @@ describe("AlternativeBoard", () => {
 
     expect(
       screen.getAllByRole("tab").map((tab) => tab.getAttribute("aria-label")),
-    ).toEqual(
-      [
-        "Participants",
-        "Teams",
-        "Badges",
-        "Matches",
-        "Stats",
-        "Explainer",
-      ],
-    );
+    ).toEqual(["Teams", "Badges", "Matches", "Stats", "Explainer"]);
+    expect(
+      screen.queryByRole("tab", { name: "Participants" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("tab", { name: "Fair Play" }),
     ).not.toBeInTheDocument();
   });
 
-  it("renders a Participants column header on the hidden board", () => {
+  it("defaults the hidden board to the Teams tab", () => {
     renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
 
-    const participantsFrame = screen.getByTestId("participants-table-frame");
-
-    expect(participantsFrame).toContainElement(
-      screen.getByRole("columnheader", { name: "Rank" }),
-    );
+    expect(screen.getByTestId("teams-row-scroll")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Team" })).toBeInTheDocument();
     expect(
-      screen.getByRole("columnheader", { name: "Participant" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("columnheader", { name: "Total points" }),
-    ).toBeInTheDocument();
-    expect(within(participantsFrame).getByText("Jobin")).toBeInTheDocument();
+      screen.queryByTestId("participants-table-frame"),
+    ).not.toBeInTheDocument();
   });
 
-  it("makes hidden board tabs and Participants headers sticky", () => {
+  it("makes hidden board tabs and default Teams header sticky", () => {
     renderAlternativeBoard(<AlternativeBoard boardData={boardData()} />);
 
     expect(screen.getByTestId("shared-scoreboard-tabs")).toHaveClass(
       "sticky",
       "top-0",
     );
-    expect(screen.getByTestId("participants-column-header")).toHaveClass(
+    expect(screen.getByTestId("teams-column-header")).toHaveClass(
       "sticky",
       "top-11",
     );
+    expect(screen.queryByTestId("participants-column-header")).not.toBeInTheDocument();
   });
 
   it("makes hidden board Teams and Matches headers sticky", () => {
@@ -282,41 +270,19 @@ describe("AlternativeBoard", () => {
     );
   });
 
-  it("renders participant rank movement on the hidden board when provided", () => {
+  it("does not render participant movement on the hidden board", () => {
     renderAlternativeBoard(
       <AlternativeBoard
         boardData={boardData()}
-        officialMovementByParticipantId={{
+        alternativeMovementByParticipantId={{
           jobin: "+1",
         }}
       />,
     );
 
-    const participantsFrame = screen.getByTestId("participants-table-frame");
-
-    expect(
-      within(participantsFrame).getByRole("columnheader", { name: "Change" }),
-    ).toBeInTheDocument();
-    expect(within(participantsFrame).getByText("Pts")).toBeInTheDocument();
-    expect(within(participantsFrame).getByText("Chg")).toBeInTheDocument();
-    expect(within(participantsFrame).getByText("+1")).toBeInTheDocument();
-    expect(within(participantsFrame).getAllByText("-").length).toBeGreaterThan(0);
-
-    const jobinRow = within(participantsFrame)
-      .getByText("Jobin")
-      .closest('[role="row"]');
-
-    expect(jobinRow).not.toBeNull();
-    expect(within(jobinRow as HTMLElement).getByText("83")).toBeInTheDocument();
-    expect(
-      within(jobinRow as HTMLElement).getByText("2 teams"),
-    ).toBeInTheDocument();
-    expect(
-      within(jobinRow as HTMLElement).getByText("+1"),
-    ).toBeInTheDocument();
-    expect(
-      within(jobinRow as HTMLElement).queryByText("Change +1"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Change" })).not.toBeInTheDocument();
+    expect(screen.queryByText("+1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("participants-table-frame")).not.toBeInTheDocument();
   });
 
   it("removes participant sidebar cards from the hidden board", () => {
@@ -684,10 +650,10 @@ describe("AlternativeBoard", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "The Participants tab shows everyone's current sweepstake position and allocated teams.",
+      screen.queryByText(
+        "The Participants tab shows everyone's current sweepstake position and allocated teams. If someone has two teams, their score is the average of those teams' scores.",
       ),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText(
         "Badges on this board are awarded by team performance and shown as Participant Name (Team Name).",
@@ -754,6 +720,9 @@ describe("AlternativeBoard", () => {
       />,
     );
 
+    expect(
+      screen.getByRole("tab", { name: "Participants" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Choose your name")).toBeInTheDocument();
     expect(screen.getByText("Email optional")).toBeInTheDocument();
     expect(screen.getByTestId("shared-scoreboard-tabs")).not.toHaveClass(

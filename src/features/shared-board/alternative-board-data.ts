@@ -30,6 +30,15 @@ export type AlternativeTeamBoardRow = {
   nextFixture: string;
 };
 
+type NormalizedMatchStage =
+  | "group"
+  | "last-32"
+  | "round-of-16"
+  | "quarter-final"
+  | "semi-final"
+  | "third-place"
+  | "final";
+
 export type AlternativeBadgeRow = {
   id: string;
   label: string;
@@ -174,7 +183,7 @@ function findAlternativeBadgeHolder(
     case "wooden-spoon":
       return teamRows.at(-1) ?? null;
     case "first-knocked-out":
-      return null;
+      return findFirstKnockedOut(teamRows, matches);
     case "most-goals-conceded":
       return findMetricLeader(teamRows, (team) => team.goalsAgainst, "max");
     case "fewest-goals-scored":
@@ -203,6 +212,37 @@ function findMetricLeader(
       : Math.min(...teamRows.map(metric));
 
   return teamRows.find((team) => metric(team) === targetValue) ?? null;
+}
+
+function findFirstKnockedOut(
+  teamRows: AlternativeTeamBoardRow[],
+  matches: SharedBoardData["matches"],
+) {
+  const teamsById = new Map(teamRows.map((team) => [team.teamId, team]));
+
+  for (const match of matches
+    .filter(isFinalKnockoutMatch)
+    .sort(sortByKickoff)) {
+    const loserTeamId = getLoserTeamId(match);
+
+    if (loserTeamId && teamsById.has(loserTeamId)) {
+      return teamsById.get(loserTeamId) ?? null;
+    }
+  }
+
+  return null;
+}
+
+function isFinalKnockoutMatch(match: SharedBoardData["matches"][number]) {
+  return (
+    match.status === "final" &&
+    !isGroupStage(match.stage) &&
+    match.homeTeamId != null &&
+    match.awayTeamId != null &&
+    match.homeScore != null &&
+    match.awayScore != null &&
+    match.homeScore !== match.awayScore
+  );
 }
 
 function teamHasFinalMatch(
@@ -264,7 +304,7 @@ export function calculateAlternativeBoardTeamPoints(
   return calculateAlternativeBoardPoints({
     groupStageWins,
     groupStageDraws,
-    reachedStage: team.status,
+    reachedStage: deriveAlternativeReachedStage(team, matches),
   });
 }
 
@@ -346,7 +386,7 @@ export function buildAlternativeTeamBoardRows(
         goalsAgainst: record.goalsAgainst,
         goalDifference: record.goalsFor - record.goalsAgainst,
         points: calculateAlternativeBoardTeamPoints(team, boardData.matches),
-        status: team.status,
+        status: deriveAlternativeReachedStage(team, boardData.matches),
         nextFixture: nextMatch ? formatNextFixture(team.id, nextMatch) : "-",
       };
     });
@@ -417,6 +457,20 @@ function getGoalsAgainst(
   return 0;
 }
 
+function getLoserTeamId(match: SharedBoardData["matches"][number]) {
+  if (
+    match.homeTeamId == null ||
+    match.awayTeamId == null ||
+    match.homeScore == null ||
+    match.awayScore == null ||
+    match.homeScore === match.awayScore
+  ) {
+    return null;
+  }
+
+  return match.homeScore < match.awayScore ? match.homeTeamId : match.awayTeamId;
+}
+
 function sortByKickoff(
   a: SharedBoardData["matches"][number],
   b: SharedBoardData["matches"][number],
@@ -440,26 +494,83 @@ function isGroupStage(stage: string) {
   return normalizeMatchStage(stage) === "group";
 }
 
-function normalizeMatchStage(stage: string) {
+function normalizeMatchStage(stage: string): NormalizedMatchStage {
   switch (stage) {
+    case "GROUP_STAGE":
+    case "Group":
+    case "Group Stage":
+      return "group";
+    case "LAST_32":
+    case "ROUND_OF_32":
+    case "Last 32":
+    case "Round of 32":
+      return "last-32";
     case "LAST_16":
     case "ROUND_OF_16":
+    case "Last 16":
     case "Round of 16":
       return "round-of-16";
     case "QUARTER_FINALS":
     case "QUARTER_FINAL":
+    case "Quarter Finals":
+    case "Quarter Final":
     case "Quarter-final":
       return "quarter-final";
     case "SEMI_FINALS":
     case "SEMI_FINAL":
+    case "Semi Finals":
     case "Semi-final":
       return "semi-final";
+    case "THIRD_PLACE":
+    case "Third Place":
+      return "third-place";
     case "FINAL":
     case "Final":
       return "final";
     default:
       return "group";
   }
+}
+
+function deriveAlternativeReachedStage(
+  team: SharedBoardData["teams"][number],
+  matches: SharedBoardData["matches"],
+): SharedBoardTeamStatus {
+  const teamMatches = matches.filter(
+    (match) => match.homeTeamId === team.id || match.awayTeamId === team.id,
+  );
+  const normalizedStages = teamMatches.map((match) =>
+    normalizeMatchStage(match.stage),
+  );
+
+  let matchStage: SharedBoardTeamStatus = "group";
+
+  if (normalizedStages.includes("final")) {
+    const final = teamMatches.find(
+      (match) => normalizeMatchStage(match.stage) === "final",
+    );
+
+    matchStage = final && final.status === "final" && teamWonMatch(team.id, final)
+      ? "winner"
+      : "runner-up";
+  } else if (normalizedStages.includes("semi-final")) {
+    matchStage = "semi-final";
+  } else if (normalizedStages.includes("quarter-final")) {
+    matchStage = "quarter-final";
+  } else if (normalizedStages.includes("round-of-16")) {
+    matchStage = "round-of-16";
+  }
+
+  return teamStatusSortOrder[team.status] > teamStatusSortOrder[matchStage]
+    ? team.status
+    : matchStage;
+}
+
+function teamWonMatch(
+  teamId: string,
+  match: SharedBoardData["matches"][number],
+) {
+  return getGoalsFor(teamId, match) > getGoalsAgainst(teamId, match);
 }
 
 function formatNextFixture(
